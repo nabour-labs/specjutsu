@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::Result;
@@ -43,6 +43,71 @@ fn main() -> ExitCode {
 
 fn run() -> Result<ExitCode> {
     match Cli::parse().command {
-        Command::Trace { .. } => todo!("TRACE-006"),
+        Command::Trace {
+            root,
+            spec_root,
+            json,
+            strict,
+        } => {
+            let scenarios = sj_core::spec::load_scenarios(&root.join(&spec_root))?;
+            let tests = sj_core::testscan::scan_tree(&root)?;
+            let report = sj_core::trace::build_report(&scenarios, &tests);
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                print_compact(&report, &root);
+            }
+            Ok(if strict && !report.is_clean() {
+                ExitCode::from(1)
+            } else {
+                ExitCode::SUCCESS
+            })
+        }
+    }
+}
+
+fn plural(n: usize, word: &str) -> String {
+    if n == 1 {
+        format!("{n} {word}")
+    } else {
+        format!("{n} {word}s")
+    }
+}
+
+fn rel(path: &Path, root: &Path) -> String {
+    path.strip_prefix(root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
+fn print_compact(r: &sj_core::trace::Report, root: &Path) {
+    println!(
+        "trace: {} mapped, {}, {}, {} without ID",
+        r.mapped.len(),
+        plural(r.gaps.len(), "gap"),
+        plural(r.orphans.len(), "orphan"),
+        r.unidentified.len()
+    );
+    for g in &r.gaps {
+        println!(
+            "gap     {} {}  ({}:{})",
+            g.id.as_deref().unwrap_or_default(),
+            g.name,
+            rel(&g.file, root),
+            g.line
+        );
+    }
+    for o in &r.orphans {
+        println!(
+            "orphan  {} {}  ({}:{})",
+            o.id,
+            o.test.name,
+            rel(&o.test.file, root),
+            o.test.line
+        );
+    }
+    for u in &r.unidentified {
+        println!("no-id   {}  ({}:{})", u.name, rel(&u.file, root), u.line);
     }
 }

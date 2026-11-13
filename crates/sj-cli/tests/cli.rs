@@ -18,8 +18,12 @@ fn trace_006_compact_report_exits_zero() {
         .stdout(predicate::str::contains(
             "trace: 2 mapped, 1 gap, 1 orphan, 1 without ID",
         ))
-        .stdout(predicate::str::contains("gap     AUTH-002 Reject a wrong password"))
-        .stdout(predicate::str::contains("orphan  AUTH-009 auth_009_points_at_nothing"));
+        .stdout(predicate::str::contains(
+            "gap     AUTH-002 Reject a wrong password",
+        ))
+        .stdout(predicate::str::contains(
+            "orphan  AUTH-009 auth_009_points_at_nothing",
+        ));
 }
 
 #[test]

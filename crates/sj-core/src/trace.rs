@@ -1,5 +1,6 @@
 //! Join scenarios and tests into a trace report.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use serde::Serialize;
@@ -43,8 +44,71 @@ impl Report {
 
 /// Link tests to scenarios. A name-embedded ID counts as an orphan only when its prefix is one the
 /// specs use (avoids noise like `v_2`); `// spec:` comment IDs are explicit and always count.
-pub fn build_report(_scenarios: &[Scenario], _tests: &[TestFn]) -> Report {
-    todo!("TRACE-005")
+pub fn build_report(scenarios: &[Scenario], tests: &[TestFn]) -> Report {
+    let mut report = Report::default();
+    // First occurrence of each ID wins (a change's delta may repeat a current-spec ID).
+    let mut order: Vec<&Scenario> = Vec::new();
+    let mut known: BTreeSet<&str> = BTreeSet::new();
+    for s in scenarios {
+        match &s.id {
+            None => report.unidentified.push(s.clone()),
+            Some(id) => {
+                if known.insert(id.as_str()) {
+                    order.push(s);
+                }
+            }
+        }
+    }
+    let prefixes: BTreeSet<&str> = known
+        .iter()
+        .filter_map(|id| id.rsplit_once('-').map(|(p, _)| p))
+        .collect();
+
+    let mut links: BTreeMap<&str, Vec<TestRef>> = BTreeMap::new();
+    for t in tests {
+        let tref = TestRef {
+            name: t.name.clone(),
+            file: t.file.clone(),
+            line: t.line,
+        };
+        let mut ids: Vec<(String, bool)> =
+            t.comment_ids.iter().map(|i| (i.clone(), true)).collect();
+        ids.extend(ids_in_name_deduped(&t.name, &t.comment_ids));
+        for (id, explicit) in ids {
+            if let Some(k) = known.get(id.as_str()) {
+                links.entry(k).or_default().push(tref.clone());
+            } else {
+                let prefix = id.rsplit_once('-').map_or("", |(p, _)| p);
+                if explicit || prefixes.contains(prefix) {
+                    report.orphans.push(Orphan {
+                        id,
+                        test: tref.clone(),
+                    });
+                }
+            }
+        }
+    }
+
+    for s in order {
+        let id = s.id.as_deref().unwrap_or_default();
+        match links.remove(id) {
+            Some(tests) => report.mapped.push(Mapped {
+                id: id.to_string(),
+                name: s.name.clone(),
+                tests,
+            }),
+            None => report.gaps.push(s.clone()),
+        }
+    }
+    report
+}
+
+fn ids_in_name_deduped(name: &str, already: &[String]) -> Vec<(String, bool)> {
+    crate::testscan::ids_in_name(name)
+        .into_iter()
+        .filter(|id| !already.contains(id))
+        .map(|id| (id, false))
+        .collect()
 }
 
 #[cfg(test)]

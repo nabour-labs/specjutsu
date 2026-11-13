@@ -22,3 +22,6 @@ First real code in the repo. Must stay dependency-light and deterministic.
 
 - Text matching can't confirm a test actually runs; runner-report confirmation
   lands with `sj test`.
+- **Orphan noise control.** An ID found only in a test *name* is an orphan only when
+  its prefix is one the specs use (so `unrelated_v_2_test` is not V-2). IDs in
+  `// spec:` comments are explicit and always reported when unknown.
