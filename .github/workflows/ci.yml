@@ -10,6 +10,14 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # The released sj that checks this repo. Never the binary built from the PR, so a change
+  # can't approve itself. Bump deliberately after each release.
+  SJ_VERSION: 0.2.0
+
+defaults:
+  run:
+    # Explicit bash enables pipefail, so `sj ... | tee` still fails the step.
+    shell: bash
 
 jobs:
   lint:
@@ -35,29 +43,32 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
 
-  # Bootstrapping stage 1: report-only. Once v0.1 is released, switch this job to the
-  # pinned released binary so a PR never grades itself.
+  # Spec-to-test report on every push, using the pinned release.
   trace:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo run -q -p specjutsu -- trace | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Install pinned sj
+        run: ./.github/install-sj.sh "$SJ_VERSION"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - run: sj trace | tee -a "$GITHUB_STEP_SUMMARY"
 
-  # Bootstrapping stage 1: report-only. Becomes blocking (and switches to the pinned released
-  # binary) once v0.2 ships.
+  # Bootstrapping stage 2: the pinned release gates every PR (blocking).
   gate:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build -q -p specjutsu
-      - run: ./target/debug/sj gate --base "origin/${{ github.base_ref }}" | tee -a "$GITHUB_STEP_SUMMARY"
-      - run: ./target/debug/sj gate --since "$(git rev-list --max-parents=0 HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Install pinned sj
+        run: ./.github/install-sj.sh "$SJ_VERSION"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Gate (red-on-base)
+        run: sj gate --base "origin/${{ github.base_ref }}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Gate (red-before-green history)
+        run: sj gate --since "$(git rev-list --max-parents=0 HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
