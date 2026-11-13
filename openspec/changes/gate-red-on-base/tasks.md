@@ -6,6 +6,7 @@
 ## 2. Classification
 
 - [ ] 2.1 Load base scenarios from git objects; classify added/modified/removed/unchanged (GATE-001, GATE-002)
+- [ ] 2.2 Trace base tests from git objects; classify newly tested scenarios as implemented (GATE-023)
 
 ## 3. Cargo runner (sj-runners)
 

@@ -14,6 +14,16 @@ lines differ (ignoring whitespace) is **modified**; an ID present only on base i
 - **WHEN** AUTH-001 moves from a change's delta spec into `specs/` with identical text
 - **THEN** it is classified as unchanged
 
+### Requirement: Implementing an existing scenario puts it in scope
+A scenario that is unchanged in text but had no linked test on base and has one
+at head SHALL be classified as **implemented** and treated like an added
+scenario by every gate rule, so a change that implements a spec merged earlier
+must prove it.
+
+#### Scenario: GATE-023 Implementing a previously untested scenario is gated
+- **WHEN** base already has scenario MATH-001 with no test, and the change adds a test for MATH-001 and edits `src/lib.rs`
+- **THEN** MATH-001 is classified as implemented, the change is not reported as an unspecified change, and MATH-001 must pass red-on-base
+
 ### Requirement: Every added or modified scenario has a mapped test
 The gate SHALL fail when an added or modified scenario has no linked test at head.
 

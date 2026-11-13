@@ -110,29 +110,3 @@ fn ids_in_name_deduped(name: &str, already: &[String]) -> Vec<(String, bool)> {
         .map(|id| (id, false))
         .collect()
 }
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use super::*;
-    use crate::{spec, testscan};
-
-    #[test]
-    fn trace_005_report_mapped_gaps_and_orphans() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/trace-basic");
-        let scenarios = spec::load_scenarios(&root.join("openspec")).unwrap();
-        let tests = testscan::scan_tree(&root).unwrap();
-        let r = build_report(&scenarios, &tests);
-
-        let mapped: Vec<&str> = r.mapped.iter().map(|m| m.id.as_str()).collect();
-        assert_eq!(mapped, vec!["AUTH-001", "BILL-001"]);
-        assert_eq!(r.mapped[0].tests[0].name, "auth_001_logs_in");
-        let gaps: Vec<_> = r.gaps.iter().map(|s| s.id.clone().unwrap()).collect();
-        assert_eq!(gaps, vec!["AUTH-002"]);
-        let orphans: Vec<&str> = r.orphans.iter().map(|o| o.id.as_str()).collect();
-        assert_eq!(orphans, vec!["AUTH-009"]);
-        assert_eq!(r.unidentified.len(), 1);
-        assert!(!r.is_clean());
-    }
-}

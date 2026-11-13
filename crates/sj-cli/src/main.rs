@@ -29,6 +29,24 @@ enum Command {
         #[arg(long)]
         strict: bool,
     },
+    /// CI check: every changed scenario tested, red on base, green on head.
+    Gate {
+        /// Base ref to compare against, e.g. origin/main.
+        #[arg(long, required_unless_present = "since")]
+        base: Option<String>,
+        /// Only check commit history: red commit before green, since this commit.
+        #[arg(long, conflicts_with = "base")]
+        since: Option<String>,
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
+        #[arg(long, default_value = "openspec")]
+        spec_root: PathBuf,
+        /// Warn instead of failing when a test cannot be overlaid on base.
+        #[arg(long)]
+        allow_unverifiable: bool,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -43,6 +61,7 @@ fn main() -> ExitCode {
 
 fn run() -> Result<ExitCode> {
     match Cli::parse().command {
+        Command::Gate { .. } => todo!("GATE-018, GATE-019, GATE-020"),
         Command::Trace {
             root,
             spec_root,

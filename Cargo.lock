@@ -482,12 +482,17 @@ dependencies = [
  "ignore",
  "regex",
  "serde",
+ "sj-runners",
  "tempfile",
 ]
 
 [[package]]
 name = "sj-runners"
 version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "serde",
+]
 
 [[package]]
 name = "specjutsu"

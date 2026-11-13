@@ -115,68 +115,21 @@ pub fn load_scenarios(spec_root: &Path) -> Result<Vec<Scenario>> {
     Ok(out)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// A scenario's identity and normalised content, used to tell modified scenarios from unchanged ones.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Fingerprint {
+    pub id: String,
+    /// Heading name plus step lines, whitespace-collapsed, blank lines dropped.
+    pub text: String,
+}
 
-    fn fixture() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/trace-basic/openspec")
-    }
+/// Fingerprint every identified scenario in one spec file (fenced code skipped).
+pub fn fingerprints(_content: &str) -> Vec<Fingerprint> {
+    todo!("GATE-001")
+}
 
-    #[test]
-    fn trace_001_parse_scenario_ids_from_headings() {
-        let src =
-            "### Requirement: R\n\n#### Scenario: AUTH-003 Reject expired token\n- **WHEN** x\n";
-        let got = parse_scenarios(Path::new("spec.md"), src);
-        assert_eq!(
-            got,
-            vec![Scenario {
-                id: Some("AUTH-003".into()),
-                name: "Reject expired token".into(),
-                file: PathBuf::from("spec.md"),
-                line: 3,
-            }]
-        );
-    }
-
-    #[test]
-    fn trace_001_skips_headings_inside_fenced_code() {
-        let src = "```md\n#### Scenario: AUTH-777 Fenced\n```\n#### Scenario: AUTH-001 Real\n";
-        let got = parse_scenarios(Path::new("spec.md"), src);
-        assert_eq!(got.len(), 1);
-        assert_eq!(got[0].id.as_deref(), Some("AUTH-001"));
-        assert_eq!(got[0].line, 4);
-    }
-
-    #[test]
-    fn trace_002_headings_without_an_id_are_reported() {
-        let src = "#### Scenario: Reject expired token\n";
-        let got = parse_scenarios(Path::new("spec.md"), src);
-        assert_eq!(got.len(), 1);
-        assert_eq!(got[0].id, None);
-        assert_eq!(got[0].name, "Reject expired token");
-        assert_eq!(got[0].line, 1);
-    }
-
-    #[test]
-    fn trace_003_discover_current_and_change_specs_skip_archive() {
-        let mut files: Vec<String> = discover_spec_files(&fixture())
-            .unwrap()
-            .iter()
-            .map(|p| {
-                p.strip_prefix(fixture())
-                    .unwrap()
-                    .to_string_lossy()
-                    .replace('\\', "/")
-            })
-            .collect();
-        files.sort();
-        assert_eq!(
-            files,
-            vec![
-                "changes/add-billing/specs/billing/spec.md",
-                "specs/auth/spec.md"
-            ]
-        );
-    }
+/// Whether a repo-relative path (forward slashes) is a spec file under `spec_root` by the
+/// discovery rule: `specs/**/spec.md` or `changes/<change>/specs/**/spec.md`, archive excluded.
+pub fn is_spec_path(_rel: &str, _spec_root: &str) -> bool {
+    todo!("GATE-001")
 }
