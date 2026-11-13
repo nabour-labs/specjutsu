@@ -1,0 +1,23 @@
+[package]
+name = "specjutsu"
+description = "Master the art of the spec. Makes AI coding agents prove their work."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "sj"
+path = "src/main.rs"
+
+[dependencies]
+sj-core.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+predicates.workspace = true
+tempfile.workspace = true

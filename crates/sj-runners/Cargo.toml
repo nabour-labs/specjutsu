@@ -1,0 +1,10 @@
+[package]
+name = "sj-runners"
+description = "specjutsu test-runner adapters"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
