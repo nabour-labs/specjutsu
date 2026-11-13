@@ -1,0 +1,77 @@
+name: release
+
+# Push a tag `vX.Y.Z` to build sj for every platform and publish a GitHub Release with
+# checksums. CI pins a released version (see ci.yml) so a PR never grades itself.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, musl: true }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-24.04-arm }
+          - { target: aarch64-apple-darwin, os: macos-latest }
+          - { target: x86_64-apple-darwin, os: macos-latest }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, exe: .exe }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - if: matrix.musl
+        run: sudo apt-get update -q && sudo apt-get install -yq musl-tools
+      - name: Check tag matches crate version
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          have=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          [ "$want" = "$have" ] || { echo "tag $GITHUB_REF_NAME != Cargo.toml $have"; exit 1; }
+      - run: cargo build --release --locked -p specjutsu --target ${{ matrix.target }}
+      - name: Package
+        run: |
+          name=sj-${{ matrix.target }}
+          mkdir "$name"
+          cp "target/${{ matrix.target }}/release/sj${{ matrix.exe }}" README.md LICENSE "$name/"
+          if [ "${{ runner.os }}" = Windows ]; then
+            7z a -tzip "$name.zip" "$name" > /dev/null
+          else
+            tar -czf "$name.tar.gz" "$name"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sj-${{ matrix.target }}
+          path: sj-${{ matrix.target }}.*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum sj-* > SHA256SUMS && cat SHA256SUMS
+      - name: Release notes from CHANGELOG
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '$0 ~ "^## \\[" v "\\]" {f=1; next} /^(## )?\[/ {f=0} f' CHANGELOG.md > notes.md
+          cat notes.md
+      - run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --notes-file notes.md
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -12,10 +12,18 @@ refuses anything unproven.
 tests (`cargo test`). See the [design doc](docs/specjutsu%20%E2%80%94%20Project%20Kickoff%20%26%20Design.md)
 and [analysis](docs/analysis.md).
 
-## Quickstart (from source)
+## Install
+
+Prebuilt binaries for macOS, Linux and Windows are on the
+[releases page](https://github.com/nabour-labs/specjutsu/releases). Or from source:
 
 ```bash
-cargo install --path crates/sj-cli
+cargo install --git https://github.com/nabour-labs/specjutsu --tag v0.2.0 specjutsu
+```
+
+## Quickstart
+
+```bash
 sj trace            # map scenario IDs in openspec/ to tests; list gaps
 sj trace --json     # machine-readable
 sj gate --base origin/main   # CI: changed scenarios tested, red on base, green on head
