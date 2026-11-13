@@ -1,4 +1,5 @@
-//! The CI gate: classification, rules, red-on-base, exemptions and history check.
+//! The CI gate: scenario classification, the gate rules, red-on-base, exemptions and the
+//! red-before-green history check.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
