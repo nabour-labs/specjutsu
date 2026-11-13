@@ -61,7 +61,44 @@ fn main() -> ExitCode {
 
 fn run() -> Result<ExitCode> {
     match Cli::parse().command {
-        Command::Gate { .. } => todo!("GATE-018, GATE-019, GATE-020"),
+        Command::Gate {
+            base,
+            since,
+            root,
+            spec_root,
+            allow_unverifiable,
+            json,
+        } => {
+            let report = match (base, since) {
+                (_, Some(since)) => sj_core::gate::history(&root, &since)?,
+                (Some(base), None) => sj_core::gate::run(&sj_core::gate::Options {
+                    root,
+                    spec_root,
+                    base,
+                    allow_unverifiable,
+                })?,
+                (None, None) => anyhow::bail!("pass --base <ref> or --since <commit>"),
+            };
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!("{}", report.summary);
+                for f in &report.failures {
+                    println!("fail    {f}");
+                }
+                for w in &report.warnings {
+                    println!("warn    {w}");
+                }
+                for e in &report.exemptions {
+                    println!("exempt  {e}");
+                }
+            }
+            Ok(if report.pass {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(1)
+            })
+        }
         Command::Trace {
             root,
             spec_root,

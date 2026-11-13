@@ -10,3 +10,4 @@ rust-version.workspace = true
 [dependencies]
 anyhow.workspace = true
 serde.workspace = true
+regex.workspace = true

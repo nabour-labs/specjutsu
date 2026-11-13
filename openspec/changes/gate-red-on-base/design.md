@@ -29,6 +29,15 @@ tests overlaid. Only the `cargo test` runner exists in this change.
   traced test when its last `::` segment equals the fn name and the binary
   belongs to the crate that holds the file. On base, a non-zero exit with no
   line for the test means it didn't compile → `red:compile`.
+  *As built:* matching is by function name only; crate disambiguation is
+  deferred until a real collision shows up.
+- **Overlay = everything under `tests/`.** Test targets are top-level
+  `tests/*.rs`, but helpers (`tests/support/mod.rs`) and test data must come
+  along or tests go red for the wrong reason.
+- **Implemented scenarios (GATE-023).** Base tests are traced from git objects;
+  an unchanged scenario that gains its first test is in scope. Found by running
+  the gate on this repo: the GATE spec merged before its implementation.
+- **Ignored tests on base** prove nothing and fail as `not-run-on-base`.
 - **Only scenario tests run twice.** Head runs the full suite (cheap and needed
   for refactors); base runs only the overlaid tests (`cargo test --test <file>`).
 - **Implementation files.** `*.rs` outside `tests/`, `fixtures/` and `target/`.
@@ -48,6 +57,8 @@ tests overlaid. Only the `cargo test` runner exists in this change.
   distinctly so reviewers see it; a future `--require-assert-red` can tighten it.
 - **Base build time.** A full base compile per PR. Mitigated by caching
   `target/sj-base` and running only the overlaid test binaries.
+- **Head runs can touch the tree.** `cargo test` creates `Cargo.lock` in a repo
+  that neither commits nor ignores it; the gate itself never writes to head.
 - **Text parsing of libtest output** could break if libtest changes format; it
   has been stable for years, and runner-report parsing (JUnit) arrives with more runners.
 

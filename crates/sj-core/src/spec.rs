@@ -124,12 +124,50 @@ pub struct Fingerprint {
 }
 
 /// Fingerprint every identified scenario in one spec file (fenced code skipped).
-pub fn fingerprints(_content: &str) -> Vec<Fingerprint> {
-    todo!("GATE-001")
+pub fn fingerprints(content: &str) -> Vec<Fingerprint> {
+    let scenarios = parse_scenarios(Path::new(""), content);
+    let lines: Vec<&str> = content.lines().collect();
+    let mut out = Vec::new();
+    for s in &scenarios {
+        let Some(id) = &s.id else { continue };
+        let mut parts = vec![collapse(&s.name)];
+        for line in lines.iter().skip(s.line) {
+            let t = line.trim_start();
+            if t.starts_with('#') || t.starts_with("```") || t.starts_with("~~~") {
+                break;
+            }
+            let c = collapse(line);
+            if !c.is_empty() {
+                parts.push(c);
+            }
+        }
+        out.push(Fingerprint {
+            id: id.clone(),
+            text: parts.join("\n"),
+        });
+    }
+    out
+}
+
+fn collapse(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// Whether a repo-relative path (forward slashes) is a spec file under `spec_root` by the
 /// discovery rule: `specs/**/spec.md` or `changes/<change>/specs/**/spec.md`, archive excluded.
-pub fn is_spec_path(_rel: &str, _spec_root: &str) -> bool {
-    todo!("GATE-001")
+pub fn is_spec_path(rel: &str, spec_root: &str) -> bool {
+    let root = spec_root.trim_end_matches('/');
+    let Some(rest) = rel.strip_prefix(root).and_then(|r| r.strip_prefix('/')) else {
+        return false;
+    };
+    if !rest.ends_with("/spec.md") {
+        return false;
+    }
+    if rest.starts_with("specs/") {
+        return true;
+    }
+    let mut parts = rest.split('/');
+    parts.next() == Some("changes")
+        && parts.next().is_some_and(|c| c != "archive")
+        && parts.next() == Some("specs")
 }

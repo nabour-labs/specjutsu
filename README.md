@@ -8,8 +8,8 @@ refuses anything unproven.
 
 > Keep your spec tool. specjutsu proves the code matches it.
 
-**Status:** pre-alpha (stage 0). `sj trace` works for OpenSpec specs and Rust
-tests. See the [design doc](docs/specjutsu%20%E2%80%94%20Project%20Kickoff%20%26%20Design.md)
+**Status:** pre-alpha. `sj trace` and `sj gate` work for OpenSpec specs and Rust
+tests (`cargo test`). See the [design doc](docs/specjutsu%20%E2%80%94%20Project%20Kickoff%20%26%20Design.md)
 and [analysis](docs/analysis.md).
 
 ## Quickstart (from source)
@@ -18,6 +18,7 @@ and [analysis](docs/analysis.md).
 cargo install --path crates/sj-cli
 sj trace            # map scenario IDs in openspec/ to tests; list gaps
 sj trace --json     # machine-readable
+sj gate --base origin/main   # CI: changed scenarios tested, red on base, green on head
 ```
 
 ## How tracing works
@@ -43,6 +44,16 @@ fn rejects_expired() { /* ... */ }
 
 `sj trace` reports which scenarios are covered, which have no test, and which
 tests point at scenarios that no longer exist.
+
+## How the gate works
+
+`sj gate --base origin/main` fails a change when an added, modified or newly
+implemented scenario has no test, a test fails, or a test points at a missing
+scenario. Its core check is **red-on-base**: it checks out the base commit,
+overlays only the change's `tests/` files, and requires each new test to fail
+there. A test that passes on the old code didn't drive the change. Refactors and
+chores declare an exemption with a reason (`Exempt: refactor — <why>` in the
+change's `proposal.md`).
 
 ## Roadmap
 

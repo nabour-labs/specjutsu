@@ -1,8 +1,11 @@
 //! `cargo test` runner: runs libtest and parses its stable text output.
 
 use std::path::Path;
+use std::process::Command;
+use std::sync::OnceLock;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+use regex::Regex;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -31,17 +34,49 @@ pub struct Run {
 
 impl Run {
     /// Outcome of the test whose function name is `name` (matches `name` or `…::name`).
-    pub fn outcome(&self, _name: &str) -> Option<Outcome> {
-        todo!("GATE-005")
+    pub fn outcome(&self, name: &str) -> Option<Outcome> {
+        let suffix = format!("::{name}");
+        self.results
+            .iter()
+            .find(|r| r.path == name || r.path.ends_with(&suffix))
+            .map(|r| r.outcome)
     }
 }
 
 /// Parse libtest result lines from captured output.
-pub fn parse_libtest(_output: &str) -> Vec<TestResult> {
-    todo!("GATE-005")
+pub fn parse_libtest(output: &str) -> Vec<TestResult> {
+    static LINE: OnceLock<Regex> = OnceLock::new();
+    let re = LINE.get_or_init(|| {
+        Regex::new(r"^test (\S+)(?: - should panic)? \.\.\. (ok|FAILED|ignored)").unwrap()
+    });
+    output
+        .lines()
+        .filter_map(|l| re.captures(l.trim_end()))
+        .map(|c| TestResult {
+            path: c[1].to_string(),
+            outcome: match &c[2] {
+                "ok" => Outcome::Passed,
+                "FAILED" => Outcome::Failed,
+                _ => Outcome::Ignored,
+            },
+        })
+        .collect()
 }
 
 /// Run `cargo test <args>` in `dir`, optionally with a separate target directory.
-pub fn cargo_test(_dir: &Path, _args: &[&str], _target_dir: Option<&Path>) -> Result<Run> {
-    todo!("GATE-005")
+pub fn cargo_test(dir: &Path, args: &[&str], target_dir: Option<&Path>) -> Result<Run> {
+    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    let mut cmd = Command::new(cargo);
+    cmd.arg("test").args(args).current_dir(dir);
+    if let Some(t) = target_dir {
+        cmd.env("CARGO_TARGET_DIR", t);
+    }
+    let out = cmd
+        .output()
+        .with_context(|| format!("running cargo test in {}", dir.display()))?;
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    Ok(Run {
+        success: out.status.success(),
+        results: parse_libtest(&stdout),
+    })
 }

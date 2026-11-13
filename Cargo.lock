@@ -491,6 +491,7 @@ name = "sj-runners"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "regex",
  "serde",
 ]
 

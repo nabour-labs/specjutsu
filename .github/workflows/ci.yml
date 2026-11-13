@@ -45,3 +45,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo run -q -p specjutsu -- trace | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # Bootstrapping stage 1: report-only. Becomes blocking (and switches to the pinned released
+  # binary) once v0.2 ships.
+  gate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build -q -p specjutsu
+      - run: ./target/debug/sj gate --base "origin/${{ github.base_ref }}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - run: ./target/debug/sj gate --since "$(git rev-list --max-parents=0 HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
