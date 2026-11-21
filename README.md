@@ -36,6 +36,25 @@ the agent's working loop (`sj status`, `next`, `verify`), the proof layer
 `sj migrate`. Its spec format is OpenSpec's, so existing `openspec/` folders work
 unchanged, and it replaces the OpenSpec, Spec Kit and Superpowers stack.
 
+**Best in class for spec-driven development.** specjutsu aims to be the best tool for
+spec-driven development (SDD), and it is the only one that proves the work. OpenSpec, Spec
+Kit, Kiro, Superpowers and BMAD stop at writing the spec, or ask a model whether the code
+matches it. specjutsu checks it deterministically:
+
+| | OpenSpec | Spec Kit | Kiro | Superpowers | **specjutsu** |
+| --- | --- | --- | --- | --- | --- |
+| Scenario → test trace checked | No | No | Partly (property tests, in the IDE) | No | **Yes, `sj trace`** |
+| Test must fail before the code | No | No | No | By prompt | **Enforced, then proven in CI** |
+| PR blocked until proof holds | No | No | No | No | **Yes, GitHub Action** |
+| Test-tampering checks | No | No | No | No | **Yes, `sj audit`** |
+| How the result is checked | LLM | LLM | LLM + optional tests | Prompt | **Deterministic, no LLM** |
+
+specjutsu is not ahead everywhere yet: OpenSpec parity (more agents, custom workflow
+schemas, multi-repo spec stores) is planned for v0.6 and v0.7, and bugfix specs,
+specs inferred from existing tests and property scenarios go further. See
+[How specjutsu compares](docs/competitive-analysis.md) for the full comparison, its
+sources, and the change that closes each gap.
+
 **Website:** [nabour-labs.github.io/specjutsu](https://nabour-labs.github.io/specjutsu/) ·
 **[User manual](https://nabour-labs.github.io/specjutsu/manual.html)**: install, your first
 change, CI setup, agent setup and the command reference.

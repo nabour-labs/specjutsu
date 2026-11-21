@@ -187,15 +187,16 @@ trace: <span class="c-g">3 mapped</span>, <span class="c-r">1 gaps</span>, <span
 
 <section id="compare">
   <div class="wrap">
-    <p class="eyebrow">Comparison</p>
+    <p class="eyebrow">Best in class</p>
     <h2>The only tool that verifies the spec was <span class="grad-text">built</span>,<br>not just written down.</h2>
-    <p class="section-lede">Most teams stitch two or three of these together. specjutsu is built to replace the stack with one binary, and it reads their specs so you don't start over. Here's where each one stops.</p>
+    <p class="section-lede">Most teams stitch two or three of these together. specjutsu is built to replace the stack with one binary, and it reads their specs so you don't start over. Here's where each one stops, and why specjutsu aims to be the best-in-class tool for spec-driven development. <a href="https://github.com/nabour-labs/specjutsu/blob/main/docs/competitive-analysis.md">Full comparison and sources</a>.</p>
     <div class="table-wrap">
       <table class="cmp">
         <thead>
           <tr>
             <th scope="col"></th>
             <th scope="col"><a href="https://github.com/github/spec-kit">GitHub Spec Kit</a></th>
+            <th scope="col"><a href="https://kiro.dev/docs/specs/">Kiro</a></th>
             <th scope="col"><a href="https://github.com/Fission-AI/OpenSpec">OpenSpec</a> + TDD</th>
             <th scope="col"><a href="https://github.com/obra/superpowers">Superpowers</a></th>
             <th scope="col">Superpowers + OpenSpec + TDD</th>
@@ -205,47 +206,47 @@ trace: <span class="c-g">3 mapped</span>, <span class="c-r">1 gaps</span>, <span
         <tbody>
           <tr>
             <th scope="row">Durable spec</th>
-            <td>Strong</td><td>Strongest (delta specs)</td><td class="no">None</td><td>Strong</td>
+            <td>Strong</td><td>Strong (EARS requirements)</td><td>Strongest (delta specs)</td><td class="no">None</td><td>Strong</td>
             <td class="sj">Strong: OpenSpec-compatible deltas<span class="tag live">LIVE</span></td>
           </tr>
           <tr>
             <th scope="row">Scenario → test trace checked</th>
-            <td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td>
+            <td class="no">No</td><td>Partly: property tests, IDE-only</td><td class="no">No</td><td class="no">No</td><td class="no">No</td>
             <td class="sj"><span class="yes">Yes</span>, <code>sj trace</code><span class="tag live">LIVE</span></td>
           </tr>
           <tr>
             <th scope="row">Proof the test failed first</th>
-            <td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td>
+            <td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td>
             <td class="sj"><span class="yes">Yes</span>, red-on-base in <code>sj gate</code><span class="tag live">LIVE</span></td>
           </tr>
           <tr>
             <th scope="row">TDD enforced</th>
-            <td class="no">No</td><td class="no">No (DIY)</td><td>Yes, by prompt</td><td>Yes, loosely tied to spec</td>
+            <td class="no">No</td><td class="no">No (hooks can run tests)</td><td class="no">No (DIY)</td><td>Yes, by prompt</td><td>Yes, loosely tied to spec</td>
             <td class="sj">Yes, by CI gate<span class="tag live">LIVE</span> + agent hooks<span class="tag live">LIVE</span></td>
           </tr>
           <tr>
             <th scope="row">Runtime needed</th>
-            <td>Python + uv</td><td>Node 20.19+</td><td>None</td><td>Node</td>
+            <td>Python + uv</td><td>IDE or CLI, paid</td><td>Node 20.19+</td><td>None</td><td>Node</td>
             <td class="sj">None: single binary<span class="tag live">LIVE</span></td>
           </tr>
           <tr>
             <th scope="row">Reads other tools' specs</th>
-            <td class="no">No</td><td class="no">No</td><td class="no">n/a</td><td class="no">n/a</td>
+            <td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">n/a</td><td class="no">n/a</td>
             <td class="sj">OpenSpec natively<span class="tag live">LIVE</span> · Spec Kit import<span class="tag live">LIVE</span></td>
           </tr>
           <tr>
             <th scope="row">Existing projects</th>
-            <td>Via extension</td><td>Best</td><td>Weak</td><td>Good</td>
+            <td>Via extension</td><td>Good</td><td>Best</td><td>Weak</td><td>Good</td>
             <td class="sj"><code>sj adopt</code>, incremental<span class="tag live">LIVE</span></td>
           </tr>
           <tr>
             <th scope="row">Monorepo-aware</th>
-            <td>Limited</td><td>Limited</td><td class="no">No</td><td>Limited</td>
+            <td>Limited</td><td>Not documented</td><td>Limited</td><td class="no">No</td><td>Limited</td>
             <td class="sj">Per-package specs and runners<span class="tag live">LIVE</span></td>
           </tr>
           <tr>
             <th scope="row">Token cost</th>
-            <td>High ceremony</td><td>Low</td><td>Medium</td><td>High (two workflows)</td>
+            <td>High ceremony</td><td>Credit-metered</td><td>Low</td><td>Medium</td><td>High (two workflows)</td>
             <td class="sj">Designed for lowest; public benchmark<span class="tag soon">v0.5</span></td>
           </tr>
         </tbody>
