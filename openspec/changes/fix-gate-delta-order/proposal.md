@@ -18,7 +18,7 @@ gate then sees a modification that no branch made.
 None.
 
 ### Modified Capabilities
-- `gate`: classification states which text wins when an ID appears in several files.
+- `gate`: a new requirement states which text wins when an ID appears in several files.
 
 ## Impact
 

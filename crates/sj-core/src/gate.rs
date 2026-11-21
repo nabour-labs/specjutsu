@@ -661,8 +661,13 @@ pub fn prepare(root: &Path, spec_root_rel: &Path, config: &Config, base: &str) -
     let mut base_texts: BTreeSet<String> = BTreeSet::new();
     // Texts of base scenarios without an ID: gaining one is not a change (GATE-036).
     let mut base_unidentified: BTreeSet<String> = BTreeSet::new();
-    let base_paths = git.ls_tree(&mb)?;
+    let mut base_paths = git.ls_tree(&mb)?;
     let base_root = base_spec_root(&git, &mb, &spec_root, &base_paths);
+    // Read base in head's order (`spec::discover_spec_files`: `specs/`, then each change), so
+    // `classify`'s last-occurrence rule lets a change's delta win on both sides (GATE-045).
+    // Git lists `changes/` before `specs/`.
+    let changes_dir = format!("{}/changes/", base_root.trim_end_matches('/'));
+    base_paths.sort_by_key(|p| p.starts_with(&changes_dir));
     for path in base_paths {
         if spec::is_spec_path(&path, &base_root) {
             let content = git.show(&mb, &path)?;
