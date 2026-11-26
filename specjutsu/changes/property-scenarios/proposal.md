@@ -40,6 +40,7 @@ None.
 - `trace`: tests are marked property or not, and FOR ALL scenarios without a property test
   are listed.
 - `gate`: FOR ALL scenarios need a property test.
+- `loop`: `sj verify` reports, and strict `sj task done` refuses, FOR ALL scenarios without a property test.
 - `skills`: `sj-propose` and `sj-apply` describe FOR ALL.
 
 ## Impact

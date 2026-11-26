@@ -40,8 +40,17 @@ test.
 `sj trace` SHALL list every FOR ALL scenario whose linked tests are all non-property tests
 as `not-property <ID> <test>...`, and `sj trace --json` SHALL list those IDs under
 `not_property`. A FOR ALL scenario with no test at all SHALL be a gap, as before, and not
-listed as `not-property`. `--strict` SHALL exit 1 when any are listed.
+listed as `not-property`. `--strict` SHALL exit 1 when any are listed. Whether a scenario is FOR ALL SHALL
+be read from an open change's copy of it when there is one, as the gate does.
 
 #### Scenario: TRACE-027 A FOR ALL scenario with only example tests is listed
 - **WHEN** FOR ALL scenario PAY-020 is linked only to `pay_020_refund_of_50_on_100` and that test is not a property test
 - **THEN** `sj trace` prints `not-property PAY-020 pay_020_refund_of_50_on_100`, `sj trace --json` lists `PAY-020` under `not_property`, and `sj trace --strict` exits 1
+
+#### Scenario: TRACE-028 A change that adds FOR ALL to a scenario is checked by its copy
+- **WHEN** `specs/pay/spec.md` has PAY-020 without a FOR ALL step, an open change MODIFIES PAY-020 to add `- **FOR ALL** charges and refund requests`, and its only test `pay_020_refund_of_50_on_100` is not a property test
+- **THEN** `sj trace` prints `not-property PAY-020 pay_020_refund_of_50_on_100`
+
+#### Scenario: TRACE-029 A change that removes FOR ALL from a scenario is not listed
+- **WHEN** `specs/pay/spec.md` has PAY-020 with a FOR ALL step, an open change MODIFIES PAY-020 to drop it, and its only test is not a property test
+- **THEN** `sj trace` lists no `not-property` line and `sj trace --strict` exits 0

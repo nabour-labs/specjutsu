@@ -37,9 +37,13 @@ line and mark it `skipped` from what surrounds it, so a property flag belongs th
   through a name imported from `fast-check`. Rejected: detecting from runtime output, which
   the libraries print only on failure, so a `[keep]` test or a head run could never be
   checked; and an author's marker comment, which anyone can add to an example test.
-- **The import must bind the name (JS/TS and Python).** A helper called `property()` or a
-  local `given` decorator would otherwise count. Rust needs no import check, since
-  `proptest!` and `#[proptest]` only come from proptest crates.
+- **JS/TS must bind the called name to a fast-check import; Python must import hypothesis.**
+  In JS/TS, a helper called `property()` would otherwise count. In Python, the file must
+  import `hypothesis` (`import hypothesis` or `from hypothesis import ...`) and the test must
+  have a `@given(` or `@hypothesis.given(` decorator; the decorator is not bound to the
+  import, so a local `given` in a file that also imports hypothesis still counts, which we
+  accept. Rust needs no import check, since `proptest!` and `#[proptest]` only come from
+  proptest crates.
 - **A mixed scenario passes on its property tests.** When a FOR ALL scenario has a property
   test and example tests, the example tests run as usual, but only property tests count as
   evidence. Rejected: requiring every mapped test to be a property test, which would stop
@@ -56,7 +60,10 @@ line and mark it `skipped` from what surrounds it, so a property flag belongs th
 - [A property test that ignores its generated input passes as a property test] → `sj audit`
   already flags tests that lost their assertions; generator quality stays a review concern.
 - [Aliased or re-exported imports (`import { assert as check } from 'fast-check'`, a local
-  `test-utils` module re-exporting `fc`) are missed] → the hint names the library and the
-  direct import form; re-exports can be a follow-up if anyone hits them.
+  `test-utils` module re-exporting `fc`) are missed] → the hint names the library;
+  re-exports can be a follow-up if anyone hits them.
+- [A test whose callback is a function reference (`it('...', body)`) is not scanned through the
+  reference] → only the tokens inside the test call count as its body; the hint names the inline
+  form. Resolving references can follow if anyone hits it.
 - [Authors put FOR ALL after WHEN] → `sj spec validate` rejects it with the file and line, so
   the step always reads as the scope of the WHEN and THEN that follow.

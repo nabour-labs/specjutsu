@@ -21,3 +21,11 @@ scenarios after the evidence kinds, and `--json` SHALL mark each proven entry wi
 #### Scenario: GATE-065 A kept FOR ALL scenario needs a property test
 - **WHEN** a change adds `#### Scenario: PAY-022 [keep] Refund never exceeds the charge` with a FOR ALL step, and its only test is a property test that passes on base and at head
 - **THEN** the gate passes PAY-022 with evidence `green:keep` and `"property": true`
+
+#### Scenario: GATE-066 A mixed FOR ALL scenario is proven by its property test
+- **WHEN** a change adds FOR ALL scenario PAY-020 with a property test that fails its assertion on base and passes at head, and an example test `pay_020_refund_of_50_on_100` that passes on base and at head
+- **THEN** the gate passes PAY-020 with evidence `red:assert`, and no `green-on-base` reason names `pay_020_refund_of_50_on_100`
+
+#### Scenario: GATE-067 [keep] An example test of a FOR ALL scenario must still pass at head
+- **WHEN** a change adds FOR ALL scenario PAY-020 with a property test that is red on base and green at head, and an example test `pay_020_refund_of_50_on_100` that fails at head
+- **THEN** the gate fails with reason `failing PAY-020 pay_020_refund_of_50_on_100`
