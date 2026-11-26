@@ -137,9 +137,9 @@ fn refunds(pay_021_then: &str) -> String {
     )
 }
 
-// spec: LOOP-038
+// spec: LOOP-040
 #[test]
-fn loop_038_verify_skips_an_unchanged_for_all_scenario_in_a_modified_requirement() {
+fn loop_040_verify_leaves_an_unchanged_for_all_scenario_alone() {
     let repo = Repo::with_lib(REFUND_OK);
     repo.write(
         "openspec/specs/pay/spec.md",
@@ -171,9 +171,9 @@ fn loop_038_verify_skips_an_unchanged_for_all_scenario_in_a_modified_requirement
     assert!(stdout.contains("unproven PAY-021"), "{stdout}");
 }
 
-// spec: LOOP-039
+// spec: LOOP-041
 #[test]
-fn loop_039_strict_task_done_accepts_a_for_all_scenario_with_a_property_test() {
+fn loop_041_strict_task_done_accepts_a_for_all_scenario_with_a_property_test() {
     let repo = refunds_proven(Some("strict"), true);
     let tasks = repo.path().join("openspec/changes/refunds/tasks.md");
 
@@ -189,9 +189,9 @@ fn loop_039_strict_task_done_accepts_a_for_all_scenario_with_a_property_test() {
     );
 }
 
-// spec: LOOP-039
+// spec: LOOP-042
 #[test]
-fn loop_039_strict_task_done_accepts_an_unchanged_for_all_scenario() {
+fn loop_042_strict_task_done_accepts_an_unchanged_for_all_scenario() {
     let repo = Repo::with_lib(REFUND_OK);
     set_mode(&repo, "strict");
     repo.write(

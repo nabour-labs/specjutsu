@@ -188,6 +188,6 @@ be read from an open change's copy of it when there is one, as the gate does.
 - **WHEN** `specs/pay/spec.md` has PAY-020 without a FOR ALL step, an open change MODIFIES PAY-020 to add `- **FOR ALL** charges and refund requests`, and its only test `pay_020_refund_of_50_on_100` is not a property test
 - **THEN** `sj trace` prints `not-property PAY-020 pay_020_refund_of_50_on_100`
 
-#### Scenario: TRACE-029 A change that removes FOR ALL from a scenario is not listed
+#### Scenario: TRACE-029 [keep] A change that removes FOR ALL from a scenario is not listed
 - **WHEN** `specs/pay/spec.md` has PAY-020 with a FOR ALL step, an open change MODIFIES PAY-020 to drop it, and its only test is not a property test
 - **THEN** `sj trace` lists no `not-property` line and `sj trace --strict` exits 0

@@ -32,14 +32,10 @@ const SPEC: &str = "## Requirements\n\n### Requirement: Pay\nThe system SHALL re
      #### Scenario: PAY-023 Charge is never negative\n\
      - **FOR ALL** charges\n- **WHEN** x\n- **THEN** y\n";
 
-const TESTS: &str = "use proptest::prelude::*;\n\n\
-     #[test]\nfn pay_020_refund_of_50_on_100() {}\n\n\
-     proptest! {\n    \
-         #[test]\n    \
-         fn pay_022_refund_ge_zero(refund in 0u64..10_000) {\n        \
-             prop_assert!(refund >= 0);\n    \
-         }\n\
-     }\n";
+// No source line starts with `#[test]` or `fn`, so the scanner doesn't read the fixture as tests.
+const TESTS: &str = "use proptest::prelude::*;\n\n#[test]\nfn pay_020_refund_of_50_on_100() {}\n\n\
+     proptest! {\n    #[test]\n    fn pay_022_refund_ge_zero(refund in 0u64..10_000) {\n        \
+     prop_assert!(refund >= 0);\n    }\n}\n";
 
 fn sj(root: &Path, args: &[&str]) -> std::process::Output {
     Command::cargo_bin("sj")

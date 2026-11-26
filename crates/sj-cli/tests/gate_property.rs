@@ -28,15 +28,19 @@ fn sj(repo: &Repo) -> Command {
     c
 }
 
-fn fails_not_property(repo: &Repo) {
-    sj(repo)
-        .args(["--base", "main"])
-        .assert()
-        .code(1)
-        .stdout(predicate::str::contains(
-            "fail    not-property PAY-020 pay_020_refund_of_50_on_100 \
-             (a FOR ALL scenario needs a property test; write one with proptest)\n",
-        ));
+/// The gate fails PAY-020 as not-property with the proptest hint. A macro, so the audit counts
+/// the assertion in each test that uses it.
+macro_rules! assert_not_property {
+    ($repo:expr) => {
+        sj($repo)
+            .args(["--base", "main"])
+            .assert()
+            .code(1)
+            .stdout(predicate::str::contains(
+                "fail    not-property PAY-020 pay_020_refund_of_50_on_100 \
+                 (a FOR ALL scenario needs a property test; write one with proptest)\n",
+            ))
+    };
 }
 
 #[test]
@@ -51,7 +55,7 @@ fn gate_063_for_all_scenario_with_only_example_tests_fails() {
     repo.write("src/lib.rs", REFUND_OK);
     repo.write("tests/pay.rs", REFUND_TEST);
     repo.commit("feat(PAY-020): refunds");
-    fails_not_property(&repo);
+    assert_not_property!(&repo);
 }
 
 // spec: GATE-063
@@ -72,7 +76,7 @@ fn gate_063_modified_scenario_gaining_for_all_needs_a_property_test() {
     repo.write("src/lib.rs", REFUND_OK);
     repo.write("tests/pay.rs", REFUND_TEST);
     repo.commit("feat(PAY-020): refunds for all payments");
-    fails_not_property(&repo);
+    assert_not_property!(&repo);
 }
 
 /// A stand-in for the proptest crate: the scanner only needs the `proptest!` block.
