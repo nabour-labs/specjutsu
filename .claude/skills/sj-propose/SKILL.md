@@ -47,6 +47,16 @@ least one scenario:
 A good scenario is one observable behaviour that one test can prove, with concrete values,
 not "works correctly". Write questions you can't answer as `[NEEDS CLARIFICATION: …]`.
 
+When a behaviour must hold for every input, not just one example, put a FOR ALL step before
+WHEN. Its tests must then include a property test:
+
+```markdown
+#### Scenario: PAY-020 Refund never exceeds the charge
+- **FOR ALL** charges and refund requests
+- **WHEN** a refund is issued
+- **THEN** the refunded total is at most the charge
+```
+
 ## 4. design.md
 
 Context, Goals / Non-Goals, Decisions (each with the alternative you rejected), and
@@ -108,4 +118,4 @@ sj spec infer <paths> [--capability <name>] --write  # writes changes/infer-<cap
 - Run `sj spec check <change>` until no `clarify` lines remain, then go on as for any
   change. These markers are answered from the test, not with sj-clarify. The scenarios
   are `[keep]`, so their tests must pass on base and head: don't change the test bodies.
-<!-- specjutsu:generated 530eb2c46e04a5c5 -->
+<!-- specjutsu:generated 83d8156bd847752d -->

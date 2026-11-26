@@ -22,6 +22,8 @@ struct Block {
 struct Pending {
     ids: Vec<String>,
     skipped: bool,
+    /// A Hypothesis `@given(...)` decorator.
+    given: bool,
 }
 
 /// Find tests in one Python file.
@@ -43,6 +45,7 @@ pub fn scan_python(file: &Path, content: &str) -> Vec<TestFn> {
     let quoted_id =
         QUOTED_ID.get_or_init(|| Regex::new(r#"["']([A-Z][A-Z0-9]*-[0-9]+)["']"#).unwrap());
     let skip_re = SKIP.get_or_init(|| Regex::new(r"\bmark\.(?:skip|skipif|xfail)\b").unwrap());
+    let imports_hypothesis = imports_hypothesis(content);
 
     let mut out = Vec::new();
     let mut blocks: Vec<Block> = Vec::new();
@@ -130,6 +133,7 @@ pub fn scan_python(file: &Path, content: &str) -> Vec<TestFn> {
                     name_ids,
                     skipped: p.skipped || classes.iter().any(|b| b.skipped),
                     end_line: block_end(content, i, indent),
+                    property: imports_hypothesis && p.given,
                     ..TestFn::default()
                 });
             }
@@ -164,6 +168,23 @@ fn apply_decorator(
     if skip_re.is_match(text) {
         pending.skipped = true;
     }
+    let call = text.trim_start();
+    if ["given", "hypothesis.given"].iter().any(|d| {
+        call.strip_prefix(d)
+            .is_some_and(|r| r.trim_start().starts_with('('))
+    }) {
+        pending.given = true;
+    }
+}
+
+/// Whether the file has `import hypothesis` or `from hypothesis import ...` at line start.
+fn imports_hypothesis(content: &str) -> bool {
+    static IMPORT: OnceLock<Regex> = OnceLock::new();
+    IMPORT
+        .get_or_init(|| {
+            Regex::new(r"(?m)^\s*(?:import\s+hypothesis\b|from\s+hypothesis\s+import\b)").unwrap()
+        })
+        .is_match(content)
 }
 
 /// The quote that opens a docstring left unclosed on this line.

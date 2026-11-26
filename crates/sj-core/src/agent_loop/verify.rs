@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Result};
 use serde::Serialize;
 
-use super::{classification, default_base, targets, why_unproven_against_base, Ledger};
+use super::{
+    classification, default_base, not_property, targets, why_unproven_against_base, Ledger,
+};
 use crate::authoring::{self, check};
 use crate::gate;
 use crate::git::Git;
@@ -15,7 +17,7 @@ use crate::run::{self, Outcome, Scope};
 /// One line of `sj verify` output.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Problem {
-    /// `untested`, `failing`, `build-failed`, `unproven`, `orphan`, `baseline-added`,
+    /// `untested`, `not-property`, `failing`, `build-failed`, `unproven`, `orphan`, `baseline-added`,
     /// `uncovered`, `unknown`, `clarify` or `gate`.
     pub kind: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -83,6 +85,7 @@ pub fn verify(opts: &Options) -> Result<VerifyReport> {
     }
     let prep = gate::prepare(root, &opts.spec_root, &config, &base)?;
     let mut r = VerifyReport::default();
+    let classified = classification(root, &prep);
 
     // Run each linked target and record the run.
     let mut passing = Vec::new();
@@ -90,6 +93,14 @@ pub fn verify(opts: &Options) -> Result<VerifyReport> {
         if !prep.report.mapped.iter().any(|m| &m.id == id) {
             r.problems
                 .push(problem("untested", Some(id), format!("untested {id}")));
+            continue;
+        }
+        // LOOP-038: example tests can't prove a FOR ALL scenario.
+        let np = not_property(&prep.report, classified, id);
+        if !np.is_empty() {
+            for f in np {
+                r.problems.push(problem("not-property", Some(id), f));
+            }
             continue;
         }
         let run = run::run_tests(root, &opts.spec_root, &Scope::Scenario(id.clone()))?;
@@ -131,7 +142,6 @@ pub fn verify(opts: &Options) -> Result<VerifyReport> {
     // Evidence, read after the runs above were recorded.
     let ledger = Ledger::load(root)?;
     let keep = crate::spec::keep_ids(&spec_root)?;
-    let classified = classification(root, &prep);
     for id in &passing {
         if let Some(why) = why_unproven_against_base(&ledger, &keep, classified, id) {
             r.problems.push(problem(

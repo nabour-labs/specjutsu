@@ -18,6 +18,8 @@ pub struct TestRef {
     pub package: Option<String>,
     pub suite: Option<Runner>,
     pub skipped: bool,
+    /// A property test (see [`TestFn::property`]).
+    pub property: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -39,6 +41,8 @@ pub struct Report {
     pub gaps: Vec<Scenario>,
     pub orphans: Vec<Orphan>,
     pub unidentified: Vec<Scenario>,
+    /// IDs of FOR ALL scenarios whose linked tests are all example tests (none a property test).
+    pub not_property: Vec<String>,
     /// Setup problems worth a look, e.g. `no test suite: packages/ui`.
     pub warnings: Vec<String>,
 }
@@ -46,6 +50,21 @@ pub struct Report {
 impl Report {
     pub fn is_clean(&self) -> bool {
         self.gaps.is_empty() && self.orphans.is_empty()
+    }
+
+    /// The tests linked to scenario `id` (empty when it has none).
+    pub fn tests_for(&self, id: &str) -> &[TestRef] {
+        self.mapped
+            .iter()
+            .find(|m| m.id == id)
+            .map_or(&[], |m| m.tests.as_slice())
+    }
+
+    /// Each [`Report::not_property`] ID with its linked (all example) tests.
+    pub fn not_property_tests(&self) -> impl Iterator<Item = (&str, &[TestRef])> {
+        self.not_property
+            .iter()
+            .map(|id| (id.as_str(), self.tests_for(id)))
     }
 }
 
@@ -193,6 +212,8 @@ pub fn build_report(scenarios: &[Scenario], tests: &[TestFn]) -> Report {
         }
     }
     let prefixes = id_prefixes(scenarios);
+    // Unlike the first-wins order above, FOR ALL is read from a change's copy (TRACE-028/029).
+    let property = crate::spec::property_ids(scenarios);
 
     let mut links: BTreeMap<&str, Vec<TestRef>> = BTreeMap::new();
     for t in tests {
@@ -203,6 +224,7 @@ pub fn build_report(scenarios: &[Scenario], tests: &[TestFn]) -> Report {
             package: t.package.clone(),
             suite: t.suite,
             skipped: t.skipped,
+            property: t.property,
         };
         let mut ids: Vec<(String, bool)> =
             t.comment_ids.iter().map(|i| (i.clone(), true)).collect();
@@ -227,11 +249,16 @@ pub fn build_report(scenarios: &[Scenario], tests: &[TestFn]) -> Report {
     for s in order {
         let id = s.id.as_deref().unwrap_or_default();
         match links.remove(id) {
-            Some(tests) => report.mapped.push(Mapped {
-                id: id.to_string(),
-                name: s.name.clone(),
-                tests,
-            }),
+            Some(tests) => {
+                if property.contains(id) && !tests.iter().any(|t| t.property) {
+                    report.not_property.push(id.to_string());
+                }
+                report.mapped.push(Mapped {
+                    id: id.to_string(),
+                    name: s.name.clone(),
+                    tests,
+                })
+            }
             None => report.gaps.push(s.clone()),
         }
     }

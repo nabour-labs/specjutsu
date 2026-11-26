@@ -16,6 +16,15 @@ and the gate will still call the scenario proven. This file covers that judgment
 - **Use the scenario's concrete values**, not values you made up. If the scenario has none,
   that's a spec gap. Ask; don't invent them.
 
+## FOR ALL scenarios need a property test
+
+A scenario with a `- **FOR ALL**` step needs a property test that generates the inputs:
+`proptest! { ... }` or `#[proptest]` in Rust, `@given(...)` from `hypothesis` in Python,
+`fc.assert(fc.property(...))` or `fc.asyncProperty(...)` in TypeScript or JavaScript, with
+`fc` imported from `fast-check`. Example tests may sit beside it: they don't have to fail on
+base, but they must pass at head. Only property tests count as red-on-base evidence. Without
+one, `sj gate` fails `not-property <ID> <test>`.
+
 ## Watch it fail for the right reason
 
 Run `sj test <ID>` and read the failure excerpt before you write any code.
@@ -91,4 +100,4 @@ fn auth_005_refreshes_a_token_expiring_in_5_minutes() {
 - The test would still pass if you deleted the code you just wrote.
 - The test asserts a mock was called, and nothing else.
 - You changed an assertion to match what the code does instead of what the scenario says.
-<!-- specjutsu:generated 24b82061d6a4d2a3 -->
+<!-- specjutsu:generated cd6e0fbea1ab379b -->

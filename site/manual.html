@@ -162,6 +162,7 @@
           <tr><td><code>sj ids</code> for selected capabilities, brainstorming in <code>sj-explore</code></td><td><span class="badge live">v0.6.0</span></td><td>Number only the capabilities you name; <code>sj-explore</code> also handles "let's brainstorm".</td></tr>
           <tr><td><a href="https://nabour-labs.github.io/specjutsu-bench/">Token benchmark</a></td><td><span class="badge live">published</span></td><td>Public comparison against the tools specjutsu replaces: <a href="https://nabour-labs.github.io/specjutsu-bench/">see the results</a>. <code>sj gain</code> is its local half: byte counts on your machine.</td></tr>
           <tr><td><code>sj spec infer</code></td><td><span class="badge next">Unreleased</span></td><td>Draft <code>[keep]</code> scenarios from the untraced tests of an existing project.</td></tr>
+          <tr><td><code>FOR ALL</code> property scenarios</td><td><span class="badge next">Unreleased</span></td><td>A scenario that must hold for every input needs a proptest, Hypothesis or fast-check test, checked by <code>sj trace</code> and <code>sj gate</code>.</td></tr>
         </tbody>
       </table></div>
       <div class="callout"><p><b>In practice today:</b> specjutsu runs the whole loop on its own, from <code>sj spec new</code> to <code>sj spec archive</code>. You don't need OpenSpec, Spec Kit or Superpowers alongside it, and <code>sj migrate</code> removes them for you.</p></div>
@@ -318,6 +319,11 @@ The system SHALL reject tokens older than 24 hours.
 <span class="c-k">#### Scenario:</span> <span class="c-s">AUTH-003</span> Reject expired token
 - <span class="c-k">**WHEN**</span> the client calls GET /me with a token issued 25 hours ago
 - <span class="c-k">**THEN**</span> the response is 401 with code TOKEN_EXPIRED</pre>
+      <p id="property">A scenario that must hold for every input starts with a <code>FOR ALL</code> step, before WHEN. It needs a property test: one inside a Rust <code>proptest! { … }</code> block or with <code>#[proptest]</code>, a Python test with <code>@given(…)</code> in a file that imports <code>hypothesis</code>, or a TS/JS test that calls <code>fc.assert(</code>, <code>fc.property(</code> or <code>fc.asyncProperty(</code> where <code>fc</code> is a default, namespace or <code>require</code> import of <code>fast-check</code>. specjutsu reads the test source to tell; it never runs the library itself. Aliases of named imports, re-exports, <code>@fast-check/vitest</code>'s <code>test.prop</code>, a callback passed by reference and <code>proptest!(|..| ..)</code> inside a plain <code>#[test]</code> aren't detected.</p>
+<pre class="code"><span class="c-k">#### Scenario:</span> <span class="c-s">PAY-020</span> Refund never exceeds the charge
+- <span class="c-k">**FOR ALL**</span> charges and refund requests
+- <span class="c-k">**WHEN**</span> a refund is issued
+- <span class="c-k">**THEN**</span> the refunded total is at most the charge</pre>
       <p>Existing specs don't need editing by hand. <code>sj ids --write</code> adds IDs to every scenario without one, changing only the headings. Prefixes come from the capability folder (<code>user-auth</code> → <code>USERAUTH</code>) unless you map them under <code>[ids.prefixes]</code>, and a delta copy in an open change gets the same ID as its spec. <code>sj ids --write staff</code> limits the write to one capability.</p>
 
       <h3>Tests point at scenarios</h3>
@@ -494,6 +500,7 @@ sj doctor                        <span class="c-m"># hook, instructions or hook 
           <tr><td><code>green-on-base AUTH-004 &lt;test&gt;</code></td><td>The new test of an added or modified scenario already passes on the old code. For an implemented scenario that's <code>green:linked</code>, which passes.</td></tr>
           <tr><td><code>not-overlaid AUTH-004 &lt;test&gt; (&lt;file&gt;; add it to the suite's support globs)</code></td><td>The test failed to load on base because of a helper file the change added or modified and the gate didn't overlay. Checked before the <code>[keep]</code> rules and <code>compile-red</code>.</td></tr>
           <tr><td><code>compile-red AUTH-004 &lt;test&gt; (suite requires an assertion failure on base)</code></td><td>The test failed to compile or load on base in a suite with <code>red_on_base = "assert"</code>.</td></tr>
+          <tr><td><code>not-property PAY-020 &lt;test&gt; (a FOR ALL scenario needs a property test; write one with proptest)</code></td><td>An added, modified or implemented scenario with a <code>FOR ALL</code> step, <code>[keep]</code> ones included, has only example tests. The hint names the property library for the test's suite: proptest (Cargo), Hypothesis (pytest), fast-check (vitest, Jest, Playwright); for a JUnit suite, by the test file's extension (<code>.rs</code> proptest, <code>.py</code> Hypothesis, JS/TS fast-check). When it has property tests, only those count as its evidence on base; its example tests must still pass at head.</td></tr>
           <tr><td><code>unverifiable AUTH-004 &lt;test&gt;</code></td><td>The test can't run on base: inline in a Rust source file, or in a suite with <code>red_on_base = "skip"</code>. Pass <code>--allow-unverifiable</code> to warn instead.</td></tr>
           <tr><td><code>orphan AUTH-003 &lt;test&gt;</code></td><td>A test points at a scenario that was removed, and the base branch's baseline doesn't list it.</td></tr>
           <tr><td><code>baseline-added &lt;entry&gt;</code></td><td>The change adds an entry to <code>trace-baseline.txt</code> without a <code>config</code> exemption.</td></tr>
@@ -565,15 +572,15 @@ Specjutsu-Exempt: chore — bump dependencies</pre>
       <h3>Proof</h3>
       <div class="cmd">
         <h3>sj trace</h3>
-        <p>Map spec scenario IDs to tests; list gaps and orphans. Each test in <code>--json</code> carries its package, suite and whether it's skipped (<code>.skip</code>, <code>.todo</code>, <code>.fixme</code>, <code>@pytest.mark.skip</code>, Rust <code>#[ignore]</code>).</p>
+        <p>Map spec scenario IDs to tests; list gaps and orphans. A FOR ALL scenario whose linked tests are all example tests prints <code>not-property &lt;ID&gt; &lt;test&gt;...</code> and is listed under <code>not_property</code> in <code>--json</code>; a FOR ALL scenario with no test is a gap. Each test in <code>--json</code> carries its package, suite and whether it's skipped (<code>.skip</code>, <code>.todo</code>, <code>.fixme</code>, <code>@pytest.mark.skip</code>, Rust <code>#[ignore]</code>), and whether it's a <a href="#property">property test</a> (<code>"property"</code>).</p>
         <dl>
-          <dt>--strict</dt><dd>Exit 1 when there are gaps or orphans. With a <a href="#baseline">baseline</a>, only entries it doesn't list and stale entries count.</dd>
+          <dt>--strict</dt><dd>Exit 1 when there are gaps or orphans, or any not-property scenario. With a <a href="#baseline">baseline</a>, only gaps and orphans it doesn't list and stale entries count; the baseline never accepts a not-property scenario.</dd>
           <dt>--write-baseline</dt><dd>Write every current gap and orphan to <code>&lt;spec_root&gt;/trace-baseline.txt</code>, dropping stale entries, and print <code>baseline: N entries → &lt;path&gt;</code>. With <code>--json</code> or <code>--strict</code> it exits 2 and writes nothing.</dd>
         </dl>
       </div>
       <div class="cmd">
         <h3>sj gate</h3>
-        <p>CI check: every changed scenario tested, red on base, green on head. A pass sums the evidence, as in <code>gate: pass — 2 scenarios proven (1 red:assert, 1 green:linked)</code>. <code>--json</code> lists linked scenarios in <code>proven</code> with <code>"red": "green:linked"</code>, and <code>--format markdown</code> under <strong>Linked existing behaviour</strong>.</p>
+        <p>CI check: every changed scenario tested, red on base, green on head. A pass sums the evidence, as in <code>gate: pass — 2 scenarios proven (1 red:assert, 1 green:linked)</code>. <code>--json</code> lists linked scenarios in <code>proven</code> with <code>"red": "green:linked"</code>, and <code>--format markdown</code> under <strong>Linked existing behaviour</strong>. Proven FOR ALL scenarios are counted after the evidence kinds, as in <code>gate: pass — 2 scenarios proven (2 red:assert; 1 property)</code>, and each <code>proven</code> entry in <code>--json</code> carries <code>"property": true</code> or <code>false</code>.</p>
         <dl>
           <dt>--base &lt;ref&gt;</dt><dd>Base to compare against, e.g. <code>origin/main</code>. A ref that doesn't resolve exits 2 with a hint about <code>fetch-depth: 0</code>.</dd>
           <dt>--since &lt;commit&gt;</dt><dd>Check commit history instead: every <code>feat(ID)</code> commit needs an earlier <code>test(ID): red</code>.</dd>
@@ -657,11 +664,11 @@ total  3  1500  54000  97%  ~13125 tokens saved</pre>
       <div class="cmd">
         <h3>sj spec show &lt;item&gt;</h3>
         <p>Print one scenario, change or capability. Looked up as a scenario ID, then an open change, then an archived change (folder name, or bare name when only one matches), then a capability. A scenario prints with its requirement, steps, mapped tests and latest ledger result; a capability prints its <code>spec.md</code> unchanged. An unknown item exits 1 and suggests near names.</p>
-        <dl><dt>--json</dt><dd>The same data, with <code>kind</code> set to <code>scenario</code>, <code>change</code> or <code>capability</code>.</dd></dl>
+        <dl><dt>--json</dt><dd>The same data, with <code>kind</code> set to <code>scenario</code>, <code>change</code> or <code>capability</code>. A scenario has <code>"property": true</code> when it has a <a href="#property"><code>FOR ALL</code> step</a>, and <code>false</code> otherwise.</dd></dl>
       </div>
       <div class="cmd">
         <h3>sj spec validate [change]</h3>
-        <p>Scenario IDs and steps, requirement wording, delta structure, and that every task names its scenarios. Each problem has a file and line. When a MODIFIED scenario's original in <code>specs/</code> has no ID, it says to run <code>sj ids --write &lt;capability&gt;</code> first: as a warning, <code>STAFF-057 Role change is recorded: specs/staff/spec.md has this scenario without an ID; run sj ids --write staff first</code>, or, when the delta scenario has no ID either, appended to its missing-ID error. When both have IDs and they differ, it warns <code>STAFF-057 Role change is recorded: specs/staff/spec.md has this scenario as STAFF-100; give the delta copy STAFF-100</code>.</p>
+        <p>Scenario IDs and steps, requirement wording, delta structure, and that every task names its scenarios. Each problem has a file and line. When a MODIFIED scenario's original in <code>specs/</code> has no ID, it says to run <code>sj ids --write &lt;capability&gt;</code> first: as a warning, <code>STAFF-057 Role change is recorded: specs/staff/spec.md has this scenario without an ID; run sj ids --write staff first</code>, or, when the delta scenario has no ID either, appended to its missing-ID error. When both have IDs and they differ, it warns <code>STAFF-057 Role change is recorded: specs/staff/spec.md has this scenario as STAFF-100; give the delta copy STAFF-100</code>. A <code>FOR ALL</code> step after WHEN is an error: <code>PAY-021 FOR ALL step must come before WHEN (&lt;file&gt;:&lt;line&gt;)</code>.</p>
         <dl><dt>--strict</dt><dd>Fail on warnings too.</dd></dl>
       </div>
       <div class="cmd">
@@ -697,11 +704,11 @@ total  3  1500  54000  97%  ~13125 tokens saved</pre>
       </div>
       <div class="cmd">
         <h3>sj task done &lt;change&gt; &lt;task&gt;</h3>
-        <p>Tick the task's box and change no other byte. In <code>strict</code> mode it refuses unless every scenario the task names is proven. Like <code>sj verify</code>, it needs a red run only for added and modified scenarios. It always judges against the default branch, never <code>--base</code>, and when it can't classify the scenarios it warns <code>cannot classify scenarios against the merge-base, so every one needs a red run: …</code>.</p>
+        <p>Tick the task's box and change no other byte. In <code>strict</code> mode it refuses unless every scenario the task names is proven, and refuses a FOR ALL scenario whose tests are all example tests, even after red-before-green (<code>not-property &lt;ID&gt; &lt;test&gt;</code>, as <code>sj verify</code> prints it); <code>guided</code> and <code>advisory</code> modes tick the box and print the same lines as warnings. Like <code>sj verify</code>, it needs a red run only for added and modified scenarios. It always judges against the default branch, never <code>--base</code>, and when it can't classify the scenarios it warns <code>cannot classify scenarios against the merge-base, so every one needs a red run and every FOR ALL one a property test: …</code>.</p>
       </div>
       <div class="cmd">
         <h3>sj verify [change]</h3>
-        <p>The local check before a PR: the change's scenario tests, unproven scenarios, orphans, <code>sj spec check</code> problems, and the gate's rules against the merge-base, without red-on-base. The gate's <a href="#baseline">baseline</a> rules apply too: orphans the base's baseline lists aren't problems, and entries the branch adds without a <code>config</code> exemption are <code>baseline-added &lt;entry&gt;</code> problems.</p>
+        <p>The local check before a PR: the change's scenario tests, unproven scenarios, FOR ALL scenarios with only example tests (<code>not-property &lt;ID&gt; &lt;test&gt;</code>, as in the gate; a red-then-green example test doesn't prove them), orphans, <code>sj spec check</code> problems, and the gate's rules against the merge-base, without red-on-base. The gate's <a href="#baseline">baseline</a> rules apply too: orphans the base's baseline lists aren't problems, and entries the branch adds without a <code>config</code> exemption are <code>baseline-added &lt;entry&gt;</code> problems.</p>
         <p>Scenarios are classified against the merge-base as the gate does, and only added and modified ones need a red run. Unchanged scenarios, such as one copied without edits into a MODIFIED requirement, and implemented ones need only a passing latest run; their tests still run and a failure is still reported. An implemented scenario with no red-before-green in the ledger doesn't count as covering a source change, so a change that only adds its test and edits source gets <code>unspecified change</code>. On the default branch itself (the merge-base is HEAD), every scenario needs a red run.</p>
         <dl><dt>--base &lt;ref&gt;</dt><dd>Base to compare against.</dd></dl>
       </div>

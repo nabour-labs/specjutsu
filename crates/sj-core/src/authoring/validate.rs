@@ -292,6 +292,13 @@ fn check_block(
         if !s.has_then {
             r.err(format!("{label} has no THEN step"), file, s.line);
         }
+        if let Some(line) = s.late_for_all {
+            r.err(
+                format!("{label} FOR ALL step must come before WHEN"),
+                file,
+                line,
+            );
+        }
     }
 }
 

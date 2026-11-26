@@ -149,6 +149,10 @@ pub struct Input {
     pub assert_only: BTreeSet<(String, String)>,
     /// IDs of `[keep]` scenarios at head: their tests must pass on base, not fail (GATE-039).
     pub keep: BTreeSet<String>,
+    /// IDs of FOR ALL scenarios at head: only their property tests count as evidence on base;
+    /// example tests must still pass at head (GATE-066/067). Those with no property test at
+    /// all come from `trace.not_property` (GATE-063).
+    pub property: BTreeSet<String>,
     /// The trace baseline as it is on the merge base (GATE-050/051).
     pub baseline: Baseline,
     /// Baseline entries at head that base doesn't list; honoured only with a `config`
@@ -249,6 +253,42 @@ fn test_key(t: &trace::TestRef) -> (String, String) {
     (t.file.to_string_lossy().replace('\\', "/"), t.name.clone())
 }
 
+/// Whether `t`'s base run counts as evidence for scenario `id`: only property tests do for
+/// a FOR ALL scenario; its example tests must still pass at head (GATE-066/067).
+fn is_evidence(input: &Input, id: &str, t: &trace::TestRef) -> bool {
+    t.property || !input.property.contains(id)
+}
+
+/// The property library to name for a test in `t`'s suite (GATE-063).
+fn property_library(t: &trace::TestRef) -> &'static str {
+    match t.suite {
+        None | Some(Runner::Cargo) => "proptest",
+        Some(Runner::Pytest) => "Hypothesis",
+        Some(Runner::Vitest | Runner::Jest | Runner::Playwright) => "fast-check",
+        // A JUnit suite is scanned by file extension, so name the library the same way.
+        Some(Runner::Junit) => match t.file.extension().and_then(|e| e.to_str()) {
+            Some("py") => "Hypothesis",
+            Some("rs") => "proptest",
+            _ => "fast-check",
+        },
+    }
+}
+
+/// One `not-property <ID> <test> (...)` line per test of a FOR ALL scenario whose tests are
+/// all example tests (GATE-063, LOOP-038).
+pub(crate) fn not_property_failures(id: &str, tests: &[trace::TestRef]) -> Vec<String> {
+    tests
+        .iter()
+        .map(|t| {
+            format!(
+                "not-property {} (a FOR ALL scenario needs a property test; write one with {})",
+                label(id, &t.name),
+                property_library(t)
+            )
+        })
+        .collect()
+}
+
 fn is_cargo(t: &trace::TestRef) -> bool {
     matches!(t.suite, None | Some(Runner::Cargo))
 }
@@ -257,6 +297,8 @@ fn is_cargo(t: &trace::TestRef) -> bool {
 pub struct Proven {
     pub id: String,
     pub red: Red,
+    /// A FOR ALL scenario, proven by a property test (GATE-064).
+    pub property: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
@@ -407,8 +449,9 @@ pub fn evaluate(input: &Input) -> GateReport {
                 .iter()
                 .find(|m| &&m.id == *id)
                 .is_some_and(|m| {
-                    !m.tests.is_empty()
-                        && m.tests.iter().all(|t| {
+                    let mut evidence = m.tests.iter().filter(|t| is_evidence(input, id, t));
+                    evidence.clone().next().is_some()
+                        && evidence.all(|t| {
                             input.base.get(&(id.to_string(), t.name.clone())) == Some(&Red::Green)
                         })
                 })
@@ -429,6 +472,19 @@ pub fn evaluate(input: &Input) -> GateReport {
             });
             continue;
         };
+        if input.trace.not_property.iter().any(|p| p == *id) {
+            // GATE-063: a FOR ALL scenario whose tests are all example tests (trace's list).
+            r.failures.extend(not_property_failures(id, &m.tests));
+            r.rows.push(Row {
+                id: id.to_string(),
+                evidence: "not-property".to_string(),
+                tests: m.tests.iter().map(|t| t.name.clone()).collect(),
+                failed: true,
+                keep,
+                linked: false,
+            });
+            continue;
+        }
         let implemented = input.changes.get(*id) == Some(&Change::Implemented);
         let mut ok = true;
         let mut weakest: Option<Red> = None;
@@ -453,7 +509,7 @@ pub fn evaluate(input: &Input) -> GateReport {
                     r.failures.push(format!("not-run {what}"));
                 }
             }
-            if skip_red {
+            if skip_red || !is_evidence(input, id, t) {
                 continue;
             }
             let key = (id.to_string(), t.name.clone());
@@ -532,6 +588,7 @@ pub fn evaluate(input: &Input) -> GateReport {
                 r.proven.push(Proven {
                     id: id.to_string(),
                     red,
+                    property: input.property.contains(*id),
                 });
             }
         }
@@ -692,10 +749,14 @@ fn pass_summary(proven: &[Proven]) -> String {
             kinds.push(format!("{} {label}", n(k)));
         }
     }
+    let mut counts = kinds.join(", ");
+    let property = proven.iter().filter(|p| p.property).count();
+    if property > 0 {
+        counts.push_str(&format!("; {property} property"));
+    }
     format!(
-        "gate: pass — {} proven ({})",
-        plural(proven.len(), "scenario"),
-        kinds.join(", ")
+        "gate: pass — {} proven ({counts})",
+        plural(proven.len(), "scenario")
     )
 }
 
@@ -884,6 +945,8 @@ pub struct Prepared {
     pub baseline: Baseline,
     /// Entries of the head baseline that the base baseline doesn't list.
     pub baseline_added: BTreeSet<BaselineEntry>,
+    /// IDs of FOR ALL scenarios at head, by the change's version of each (GATE-063).
+    pub property: BTreeSet<String>,
 }
 
 /// Gather the gate's inputs against the merge-base of `base` and `HEAD`, without running tests.
@@ -986,6 +1049,7 @@ pub fn prepare(root: &Path, spec_root_rel: &Path, config: &Config, base: &str) -
     let scenarios = spec::load_scenarios(&head_spec_root)?;
     let scan = testscan::scan_project(root, config)?;
     let report = trace::build_report(&scenarios, &scan.tests);
+    let property = spec::property_ids(&scenarios);
 
     // GATE-023: unchanged scenarios that gain their first test are in scope.
     let base_mapped = base_mapped_ids(&git, root, config, &mb, &base_root)?;
@@ -1036,6 +1100,7 @@ pub fn prepare(root: &Path, spec_root_rel: &Path, config: &Config, base: &str) -
         exemptions,
         baseline,
         baseline_added,
+        property,
     })
 }
 
@@ -1079,6 +1144,7 @@ pub fn run(opts: &Options) -> Result<GateReport> {
         exemptions,
         baseline,
         baseline_added,
+        property,
     } = prepare(root, &opts.spec_root, &config, &opts.base)?;
 
     let targets: Vec<&String> = changes
@@ -1282,6 +1348,7 @@ pub fn run(opts: &Options) -> Result<GateReport> {
         reasons,
         assert_only,
         keep,
+        property,
         baseline,
         baseline_added,
         base_messages,

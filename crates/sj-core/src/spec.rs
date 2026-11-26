@@ -18,6 +18,8 @@ pub struct Scenario {
     pub line: usize,
     /// The heading carries `[keep]`: behaviour the change must not alter (GATE-039).
     pub keep: bool,
+    /// A step reads `- **FOR ALL** <inputs>`: the scenario is a property (SPEC-072).
+    pub property: bool,
 }
 
 /// The marker allowed between a scenario's ID and its name.
@@ -32,6 +34,31 @@ pub fn split_marker(name: &str) -> (Option<&str>, &str) {
         Some(c) => (Some(c.get(1).unwrap().as_str()), c.get(2).unwrap().as_str()),
         None => (None, name),
     }
+}
+
+/// The keyword of a scenario step line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Step {
+    ForAll,
+    When,
+    Then,
+}
+
+/// The keyword a step line opens with: `- **WHEN** ...`, `* **then** ...`, `- **FOR ALL** ...`.
+/// Bullets may be `-` or `*` and keywords any case. Other lines give `None`.
+pub fn step_keyword(line: &str) -> Option<Step> {
+    static STEP: OnceLock<Regex> = OnceLock::new();
+    let re =
+        STEP.get_or_init(|| Regex::new(r"(?i)^\s*[-*]\s+\*\*(WHEN|THEN|FOR\s+ALL)\*\*").unwrap());
+    let c = re.captures(line)?;
+    let k = &c[1];
+    Some(if k.eq_ignore_ascii_case("WHEN") {
+        Step::When
+    } else if k.eq_ignore_ascii_case("THEN") {
+        Step::Then
+    } else {
+        Step::ForAll
+    })
 }
 
 /// A scenario heading with where it sits in the file's bytes.
@@ -63,10 +90,12 @@ pub fn locate_scenarios(file: &Path, content: &str) -> Vec<Located> {
         REQUIREMENT.get_or_init(|| Regex::new(r"^###\s+Requirement:\s*(.*?)\s*$").unwrap());
     let id_re = ID.get_or_init(|| Regex::new(r"^([A-Z][A-Z0-9]*-[0-9]+)(?:\s+(.*))?$").unwrap());
 
-    let mut out = Vec::new();
+    let mut out: Vec<Located> = Vec::new();
     let mut fence: Option<&str> = None;
     let mut current_req: Option<String> = None;
     let mut offset = 0;
+    // Inside a scenario's steps: after its heading, before the next heading.
+    let mut in_steps = false;
     for (i, raw) in content.split_inclusive('\n').enumerate() {
         let line_start = offset;
         offset += raw.len();
@@ -89,6 +118,14 @@ pub fn locate_scenarios(file: &Path, content: &str) -> Vec<Located> {
             continue;
         }
         if fence.is_some() {
+            continue;
+        }
+        if trimmed.starts_with('#') {
+            in_steps = false;
+        } else if in_steps && step_keyword(line) == Some(Step::ForAll) {
+            if let Some(last) = out.last_mut() {
+                last.scenario.property = true;
+            }
             continue;
         }
         if let Some(c) = requirement.captures(line) {
@@ -122,10 +159,12 @@ pub fn locate_scenarios(file: &Path, content: &str) -> Vec<Located> {
                 file: file.to_path_buf(),
                 line: i + 1,
                 keep,
+                property: false,
             },
             title_offset: line_start + title_match.start(),
             requirement: current_req.clone(),
         });
+        in_steps = true;
     }
     out
 }
@@ -180,6 +219,21 @@ pub fn keep_ids(spec_root: &Path) -> Result<std::collections::BTreeSet<String>> 
         .into_iter()
         .filter_map(|(id, k)| k.then_some(id))
         .collect())
+}
+
+/// IDs of FOR ALL scenarios, judged by each ID's last occurrence (a change's version of a
+/// scenario wins over `specs/`, as for [`keep_ids`]).
+pub fn property_ids(scenarios: &[Scenario]) -> std::collections::BTreeSet<String> {
+    let mut by_id = std::collections::BTreeMap::new();
+    for s in scenarios {
+        if let Some(id) = &s.id {
+            by_id.insert(id.clone(), s.property);
+        }
+    }
+    by_id
+        .into_iter()
+        .filter_map(|(id, p)| p.then_some(id))
+        .collect()
 }
 
 /// Discover and parse every spec file under `spec_root`.

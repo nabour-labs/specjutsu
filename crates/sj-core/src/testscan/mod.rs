@@ -31,6 +31,8 @@ pub struct TestFn {
     pub name_ids: Vec<String>,
     /// Marked skip/todo/fixme (or inside a skipped group).
     pub skipped: bool,
+    /// A property test: proptest (Rust), Hypothesis (Python) or fast-check (JS/TS).
+    pub property: bool,
     /// Owning package path, when found through the project config.
     pub package: Option<String>,
     /// Suite runner, when found through the project config.
@@ -47,11 +49,14 @@ pub struct TestFn {
 }
 
 /// Find test functions (`fn` items carrying a `#[...test...]` attribute) in one Rust file.
-/// An `#[ignore]` attribute marks the test skipped.
+/// An `#[ignore]` attribute marks the test skipped. A test inside a `proptest!` block or
+/// carrying a `#[proptest]` attribute is a property test.
 pub fn scan_rust(file: &Path, content: &str) -> Vec<TestFn> {
     static ATTR: OnceLock<Regex> = OnceLock::new();
     static FN: OnceLock<Regex> = OnceLock::new();
     static SPEC: OnceLock<Regex> = OnceLock::new();
+    static PROPTEST_BLOCK: OnceLock<Regex> = OnceLock::new();
+    static PROPTEST_ATTR: OnceLock<Regex> = OnceLock::new();
     let attr = ATTR.get_or_init(|| Regex::new(r"^\s*#\[").unwrap());
     let test_attr = |l: &str| attr.is_match(l) && l.contains("test") && !l.contains("cfg(test)");
     let fn_re = FN.get_or_init(|| {
@@ -63,12 +68,24 @@ pub fn scan_rust(file: &Path, content: &str) -> Vec<TestFn> {
             .unwrap()
     });
 
+    let proptest_block =
+        PROPTEST_BLOCK.get_or_init(|| Regex::new(r"^\s*(?:proptest::)?proptest!").unwrap());
+    let proptest_attr = PROPTEST_ATTR
+        .get_or_init(|| Regex::new(r"^\s*#\[(?:[A-Za-z_][A-Za-z0-9_]*::)*proptest\b").unwrap());
+
     let mut out = Vec::new();
+    // 1-based last line of the `proptest!` block being scanned, or 0 outside one.
+    let mut block_end = 0;
     // State gathered from the run of attribute/comment/blank lines above the current line.
     let mut pending_test = false;
     let mut pending_ids: Vec<String> = Vec::new();
     let mut pending_skip = false;
+    let mut pending_property = false;
     for (i, line) in content.lines().enumerate() {
+        if proptest_block.is_match(line) {
+            block_end = rust_body_end(content, i);
+            continue;
+        }
         if let Some(c) = spec_re.captures(line) {
             pending_ids.extend(c[1].split(',').map(|s| s.trim().to_string()));
             continue;
@@ -80,6 +97,11 @@ pub fn scan_rust(file: &Path, content: &str) -> Vec<TestFn> {
             .is_some_and(|c| matches!(c, ']' | '=' | '(') || c.is_whitespace())
         {
             pending_skip = true;
+            continue;
+        }
+        if proptest_attr.is_match(line) {
+            pending_test = true;
+            pending_property = true;
             continue;
         }
         if test_attr(line) {
@@ -99,12 +121,14 @@ pub fn scan_rust(file: &Path, content: &str) -> Vec<TestFn> {
                     comment_ids: std::mem::take(&mut pending_ids),
                     name_ids: ids_in_name(&c[1]),
                     skipped: pending_skip,
+                    property: pending_property || i < block_end,
                     ..TestFn::default()
                 });
             }
         }
         pending_test = false;
         pending_skip = false;
+        pending_property = false;
         pending_ids.clear();
     }
     out

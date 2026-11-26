@@ -60,6 +60,8 @@ pub enum Shown {
         line: usize,
         /// A `[keep]` scenario: behaviour the change must not alter.
         keep: bool,
+        /// A `- **FOR ALL**` step makes it a property scenario.
+        property: bool,
         requirement: Option<String>,
         /// The requirement's first paragraph: its SHALL sentence.
         statement: Option<String>,
@@ -268,6 +270,7 @@ fn scenario(root: &Path, spec_root: &Path, config: &Config, id: &str) -> Result<
             file: rel(&file, root),
             line,
             keep: loc.scenario.keep,
+            property: loc.scenario.property,
             requirement: loc.requirement.clone(),
             statement,
             steps,
@@ -380,6 +383,7 @@ pub fn render(s: &Shown) -> String {
             tests,
             latest,
             evidence,
+            ..
         } => {
             let marker = if *keep { "[keep] " } else { "" };
             let mut out = format!("{id} {marker}{name}\n");

@@ -25,10 +25,10 @@ enum Command {
         /// Print JSON instead of the compact report.
         #[arg(long)]
         json: bool,
-        /// Exit 1 on gaps or orphans the baseline doesn't list, or stale baseline entries.
+        /// Exit 1 on gaps or orphans the baseline doesn't list, stale baseline entries, or FOR ALL scenarios with no property test.
         #[arg(long)]
         strict: bool,
-        /// Write every current gap and orphan to <spec root>/trace-baseline.txt.
+        /// Write every current gap and orphan to <spec root>/trace-baseline.txt (never not-property entries).
         #[arg(long, conflicts_with_all = ["json", "strict"])]
         write_baseline: bool,
     },
@@ -903,11 +903,13 @@ fn run() -> Result<ExitCode> {
             } else {
                 print_compact(&report, &root, &known, baseline.is_some());
             }
-            Ok(if strict && known.fails_strict() {
-                ExitCode::from(1)
-            } else {
-                ExitCode::SUCCESS
-            })
+            Ok(
+                if strict && (known.fails_strict() || !report.not_property.is_empty()) {
+                    ExitCode::from(1)
+                } else {
+                    ExitCode::SUCCESS
+                },
+            )
         }
     }
 }
@@ -2135,6 +2137,7 @@ fn task_done_cmd(change: &str, task: &str, args: &SpecArgs) -> Result<ExitCode> 
         Outcome::Done {
             text,
             warnings,
+            not_property,
             notes,
         } => {
             println!("task: done {text}");
@@ -2144,14 +2147,31 @@ fn task_done_cmd(change: &str, task: &str, args: &SpecArgs) -> Result<ExitCode> 
             for u in &warnings {
                 println!("warn    unproven {} ({})", u.id, u.why);
             }
+            for l in &not_property {
+                println!("warn    {l}");
+            }
         }
-        Outcome::Refused { unproven, notes } => {
-            println!("task: refused — {} unproven", unproven.len());
+        Outcome::Refused {
+            unproven,
+            not_property,
+            notes,
+        } => {
+            let mut why = Vec::new();
+            if !unproven.is_empty() {
+                why.push(format!("{} unproven", unproven.len()));
+            }
+            if !not_property.is_empty() {
+                why.push(format!("{} not-property", not_property.len()));
+            }
+            println!("task: refused — {}", why.join(", "));
             for n in &notes {
                 println!("warn    {n}");
             }
             for u in &unproven {
                 println!("unproven {} ({})", u.id, u.why);
+            }
+            for l in &not_property {
+                println!("{l}");
             }
             return Ok(ExitCode::from(1));
         }
@@ -2412,6 +2432,7 @@ struct KnownReport<'a> {
     gaps: Vec<Flagged<'a, sj_core::spec::Scenario>>,
     orphans: Vec<Flagged<'a, sj_core::trace::Orphan>>,
     unidentified: &'a [sj_core::spec::Scenario],
+    not_property: &'a [String],
     warnings: &'a [String],
     stale: &'a [String],
 }
@@ -2430,6 +2451,7 @@ impl<'a> KnownReport<'a> {
             gaps: flag(&r.gaps, &known.gaps),
             orphans: flag(&r.orphans, &known.orphans),
             unidentified: &r.unidentified,
+            not_property: &r.not_property,
             warnings: &r.warnings,
             stale: &known.stale,
         }
@@ -2472,6 +2494,10 @@ fn print_compact(r: &sj_core::trace::Report, root: &Path, known: &Known, has_bas
             rel(&o.test.file, root),
             o.test.line
         );
+    }
+    for (id, tests) in r.not_property_tests() {
+        let names: Vec<&str> = tests.iter().map(|t| t.name.as_str()).collect();
+        println!("not-property {id} {}", names.join(" "));
     }
     for e in &known.stale {
         println!("stale {e} (remove from {})", sj_core::trace::BASELINE_FILE);

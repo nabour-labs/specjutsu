@@ -25,7 +25,7 @@ Every tool below covers some of 1–6. None covers 7. That gap is why specjutsu 
 | --- | --- | --- | --- | --- | --- | --- |
 | Licence | MIT | MIT | Proprietary, paid | MIT | MIT | **MIT** |
 | Spec format | Delta specs, WHEN/THEN | Spec, plan, tasks, Given/When/Then | EARS requirements, design, tasks | Plans, no durable spec | Persona briefs, PRD, architecture | **OpenSpec deltas, read unchanged** |
-| How the result is checked | LLM verify skill; structure lint | LLM `converge` and `analyze` | Optional property tests, in the IDE | TDD by prompt | Adversarial LLM review | **Scenario IDs traced to tests; red-on-base** |
+| How the result is checked | LLM verify skill; structure lint | LLM `converge` and `analyze` | Optional property tests, in the IDE | TDD by prompt | Adversarial LLM review | **Scenario IDs traced to tests; red-on-base; `FOR ALL` scenarios need a property test** |
 | Test must fail before code | No | No | No | Asked, not enforced | No | **Yes: edits blocked, then proven in CI** |
 | CI or PR gate | No | No | No | No | No | **Yes: GitHub Action, one PR comment** |
 | Test-tampering checks | No | No | No | No | No | **Yes: `sj audit`** |
@@ -62,14 +62,16 @@ describes itself as an agent enablement platform and is left out.
 Most OpenSpec parity work shipped by v0.5 (more agents, `show` and `view`, bulk archive,
 completions, onboarding). Custom workflow schemas and multi-repo spec stores are planned
 for v0.7. Beyond parity, these changes take ideas that other tools check with a model and
-check them deterministically instead. Specs from existing tests ships as `sj spec infer`;
-property scenarios are still planned.
+check them deterministically instead. Specs from existing tests ships as `sj spec infer`,
+and property scenarios ship as `FOR ALL` scenarios that the gate refuses without a property
+test. Keeping the shrunk counterexample as evidence is the planned follow-up,
+`property-counterexamples`.
 
 | Gap | Who has it today | How they check it | specjutsu change |
 | --- | --- | --- | --- |
 | Specs for code that already exists (OpenSpec's most-requested open issue) | cc-sdd, GSD, BMAD | A model reads the code | Ships as `sj spec infer`: it drafts a `[keep]` scenario for every untraced test, and the filled-in change passes the gate as `green:keep` |
-| Requirements that hold for all inputs | Kiro | Property tests, IDE-only, optional | Planned, `property-scenarios`: `FOR ALL` scenarios need a property test, and the counterexample is kept as evidence |
-| A public, reproducible token benchmark | No one | — | Planned for v0.6 |
+| Requirements that hold for all inputs | Kiro | Property tests, IDE-only, optional | Ships: a `FOR ALL` scenario needs a proptest, Hypothesis or fast-check test, and `sj gate` fails it as `not-property` without one. Keeping the shrunk counterexample as evidence is planned as `property-counterexamples` |
+| A public, reproducible token benchmark | No one | — | Shipped in v0.6: [the benchmark](https://nabour-labs.github.io/specjutsu-bench/) |
 
 ## Not planned
 
