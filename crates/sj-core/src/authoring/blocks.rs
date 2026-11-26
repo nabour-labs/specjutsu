@@ -147,16 +147,16 @@ pub struct Scenario {
     pub line: usize,
     pub has_when: bool,
     pub has_then: bool,
+    /// The 1-based line of the first FOR ALL step that comes after a WHEN step.
+    pub late_for_all: Option<usize>,
 }
 
 /// Scenario headings in `range`. A scenario's steps run to the next heading.
 pub fn scenarios_in(lines: &[&str], mask: &[bool], range: Range<usize>) -> Vec<Scenario> {
     static HEAD: OnceLock<Regex> = OnceLock::new();
     static ID: OnceLock<Regex> = OnceLock::new();
-    static STEP: OnceLock<Regex> = OnceLock::new();
     let head = re(&HEAD, r"^####\s+Scenario:\s*(.*?)\s*$");
     let id_re = re(&ID, r"^([A-Z][A-Z0-9]*-[0-9]+)(?:\s+(.*))?$");
-    let step = re(&STEP, r"(?i)^\s*[-*]\s+\*\*(WHEN|THEN)\*\*");
     let mut out: Vec<Scenario> = Vec::new();
     let mut current: Option<Scenario> = None;
     for i in range {
@@ -188,15 +188,19 @@ pub fn scenarios_in(lines: &[&str], mask: &[bool], range: Range<usize>) -> Vec<S
                     line: i + 1,
                     has_when: false,
                     has_then: false,
+                    late_for_all: None,
                 });
             }
             continue;
         }
-        if let (Some(s), Some(c)) = (current.as_mut(), step.captures(line)) {
-            if c[1].eq_ignore_ascii_case("WHEN") {
-                s.has_when = true;
-            } else {
-                s.has_then = true;
+        if let Some(s) = current.as_mut() {
+            match crate::spec::step_keyword(line) {
+                Some(crate::spec::Step::When) => s.has_when = true,
+                Some(crate::spec::Step::Then) => s.has_then = true,
+                Some(crate::spec::Step::ForAll) if s.has_when => {
+                    s.late_for_all.get_or_insert(i + 1);
+                }
+                _ => {}
             }
         }
     }

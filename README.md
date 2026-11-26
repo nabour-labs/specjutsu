@@ -73,6 +73,7 @@ and it checks it deterministically:
 | | OpenSpec | Spec Kit | Kiro | Superpowers | **specjutsu** |
 | --- | --- | --- | --- | --- | --- |
 | Scenario → test trace checked | No | No | Partly (property tests, in the IDE) | No | **Yes, `sj trace`** |
+| Requirement for all inputs backed by a property test | No | No | Optional, in the IDE | No | **Enforced, `FOR ALL` scenarios** |
 | Test must fail before the code | No | No | No | By prompt | **Enforced, then proven in CI** |
 | PR blocked until proof holds | No | No | No | No | **Yes, GitHub Action** |
 | Test-tampering checks | No | No | No | No | **Yes, `sj audit`** |
@@ -83,8 +84,10 @@ and it checks it deterministically:
 The [public token benchmark](https://nabour-labs.github.io/specjutsu-bench/) is out: see how many context bytes each workflow
 spends on the same feature, bug fix and change. specjutsu is not ahead everywhere yet:
 the rest of OpenSpec parity (custom workflow schemas, multi-repo spec stores) for
-v0.7, and property scenarios go further. Specs for code that already exists ship as
-`sj spec infer`, which drafts `[keep]` scenarios from untraced tests. See [How specjutsu compares](docs/competitive-analysis.md) for the full
+v0.7, and keeping the shrunk counterexample of a property test as evidence
+(`property-counterexamples`) is next. Specs for code that already exists ship as
+`sj spec infer`, which drafts `[keep]` scenarios from untraced tests, and
+[`FOR ALL` scenarios](#property-scenarios) need a property test. See [How specjutsu compares](docs/competitive-analysis.md) for the full
 comparison, its sources, and the change that closes each gap.
 
 ## Status
@@ -278,8 +281,10 @@ class TestDiff:
 `sj trace` reports which scenarios are covered, which have no test, and which
 tests point at scenarios that no longer exist. It finds test files through each
 suite in `specjutsu.toml` (see [The project file](#the-project-file)), so each
-test in `--json` carries its `package` and `suite`, and `skipped` for
-`.skip`/`.todo`/`.fixme`, `@pytest.mark.skip` and Rust `#[ignore]`. A package with source files but
+test in `--json` carries its `package` and `suite`, `skipped` for
+`.skip`/`.todo`/`.fixme`, `@pytest.mark.skip` and Rust `#[ignore]`, and `property`
+for a proptest, Hypothesis or fast-check test (see
+[Property scenarios](#property-scenarios)). A package with source files but
 no suite gets a `warn    no test suite: <path>` line. Titles built at runtime
 (variables, `${}` templates) are not read. Use a `// spec:` comment for those.
 
@@ -853,7 +858,8 @@ and *clarify* passes. Existing `openspec/` folders work unchanged.
   its proposal, each delta under a `--- <capability>` header and its task
   count, or `archived <date>`. A capability prints its `spec.md` byte for
   byte. An unknown item exits 1 and suggests up to three near names. `--json`
-  prints the same data with a `kind` field.
+  prints the same data with a `kind` field; a scenario also has `"property"`,
+  true when it has a [`FOR ALL` step](#property-scenarios).
 - **`sj spec validate [<change>]`** reports each problem with its file and line:
   - A scenario without an ID, a duplicate ID, or a missing WHEN or THEN step.
   - A requirement with no scenario, or with no SHALL or MUST.
@@ -863,6 +869,8 @@ and *clarify* passes. Existing `openspec/` folders work unchanged.
   - A task that names no scenario ID. Mark tasks that cover none with
     `(no-scenario: <reason>)`, for example docs.
   - A scenario marker other than `[keep]`.
+  - A `FOR ALL` step after the WHEN step: `PAY-021 FOR ALL step must come before
+    WHEN (<file>:<line>)`.
 
   A scenario in a MODIFIED requirement whose original in `specs/` has no ID gets
   a hint, since OpenSpec matches scenarios by full name and would read the copy as
@@ -926,6 +934,50 @@ change breaks it. The PR comment lists kept scenarios under **Kept behaviour**.
 Expected and Unchanged Behaviour sections and a `Kind: bug` line, which makes
 `sj spec check` ask for both kinds of scenario. The `sj-debug` skill writes
 bug fixes this way.
+
+### Property scenarios
+
+Some behaviour must hold for every input, not just the values a test picks. A
+`FOR ALL` step, before WHEN, says so:
+
+```markdown
+#### Scenario: PAY-020 Refund never exceeds the charge
+- **FOR ALL** charges and refund requests
+- **WHEN** a refund is issued
+- **THEN** the refunded total is at most the charge
+```
+
+Such a scenario needs a property test. specjutsu finds them by reading the test
+source; it never runs or imports the libraries itself:
+
+- **Rust:** a test inside a `proptest! { ... }` block, or one with `#[proptest]`.
+- **Python:** a test with `@given(...)` or `@hypothesis.given(...)` in a file that
+  imports `hypothesis`.
+- **TS/JS:** a test that calls `<name>.assert(`, `<name>.property(` or
+  `<name>.asyncProperty(`, where `<name>` comes from `import fc from 'fast-check'`,
+  `import * as fc from 'fast-check'`, `import fc, { … } from 'fast-check'`,
+  `const fc = require('fast-check')` or TS `import fc = require('fast-check')`.
+
+Not detected: aliases of named imports (`import { assert as check }`), re-exports,
+`@fast-check/vitest`'s `test.prop`, a property callback passed by reference, and the
+closure form `proptest!(|..| ..)` inside a plain `#[test]`.
+
+`sj spec validate` reports `PAY-021 FOR ALL step must come before WHEN (<file>:<line>)`
+when the step is out of place, and `sj spec show <ID> --json` reports `"property": true`.
+Each test in `sj trace --json` carries `"property"`. A FOR ALL scenario whose linked tests
+are all example tests is listed as `not-property PAY-020 pay_020_refund_of_50_on_100`, and
+under `not_property` in `--json`; `--strict` exits 1 on it, and the baseline never
+records it. A FOR ALL scenario with no test is a gap, as before.
+
+The gate fails such a scenario, `[keep]` ones included, with
+`not-property PAY-020 pay_020_refund_of_50_on_100 (a FOR ALL scenario needs a property
+test; write one with proptest)`. The hint names proptest for Cargo suites, Hypothesis
+for pytest and fast-check for vitest, Jest and Playwright; JUnit suites pick it by the
+test file's extension (`.rs` proptest, `.py` Hypothesis, JS/TS fast-check). When a scenario has both
+kinds, only its property tests count as evidence on base, and its example tests must
+still pass at head. The pass line counts proven properties after the evidence kinds,
+as in `gate: pass — 2 scenarios proven (2 red:assert; 1 property)`, and each `proven`
+entry in `--json` has `"property": true` or `false`.
 
 ### Specs from existing tests
 
@@ -1075,12 +1127,16 @@ takes `--json`, except `sj task done`.
   file.
 - **`sj task done <change> <task>`** checks that task's box and changes no
   other byte. In `strict` mode it refuses, exiting 1, unless every scenario the
-  task names is proven: `unproven AUTH-005 (no red run recorded)`. In `guided`
-  and `advisory` modes it checks the box and prints the same lines as warnings.
+  task names is proven: `unproven AUTH-005 (no red run recorded)`. It also
+  refuses a FOR ALL scenario whose tests are all example tests, even after
+  red-before-green: `not-property <ID> <test>`, as `sj verify` prints it. In
+  `guided` and `advisory` modes it checks the box and prints the same lines as
+  warnings.
   Like `sj verify`, it asks for a red run only for added and modified scenarios
   (see below). It always judges against the default branch, never `--base`, and
   when it can't classify the scenarios it warns `cannot classify scenarios
-  against the merge-base, so every one needs a red run: <why>`.
+  against the merge-base, so every one needs a red run and every FOR ALL one a
+  property test: <why>`.
 - **`sj view`** prints a one-screen project dashboard: each capability with
   its scenario count, each open change with its tasks and scenario evidence
   (the counts `sj status` uses), evidence totals over every scenario, the
@@ -1089,7 +1145,9 @@ takes `--json`, except `sj task done`.
   runs tests.
 - **`sj verify [<change>]`** is the local check before a PR. It runs the
   change's scenario tests (recording them), and reports untested and failing
-  scenarios, unproven ones, orphans, `sj spec check` problems, and the gate's
+  scenarios, unproven ones, FOR ALL scenarios with only example tests
+  (`not-property <ID> <test>`, as in the gate; a red-then-green example test
+  doesn't prove them), orphans, `sj spec check` problems, and the gate's
   unspecified-change, exemption and trace baseline rules against the merge-base:
   orphans the base's baseline lists aren't problems, and entries the branch adds
   without a `config` exemption are `baseline-added <entry>` problems. Red-on-base

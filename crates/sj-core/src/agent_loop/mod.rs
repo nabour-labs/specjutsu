@@ -134,6 +134,25 @@ pub fn classification<'a>(
     (prep.mb != head).then_some(&prep.changes)
 }
 
+/// `not-property` lines for `id` when it is a FOR ALL scenario whose tests are all example
+/// tests and is in the gate's scope: added, modified or implemented in `changes`, or any
+/// scenario without a classification (GATE-063). Shared by `sj verify` (LOOP-038) and
+/// `sj task done` (LOOP-039).
+pub(crate) fn not_property(
+    report: &crate::trace::Report,
+    changes: Option<&BTreeMap<String, crate::gate::Change>>,
+    id: &str,
+) -> Vec<String> {
+    use crate::gate::Change as C;
+    let in_scope = changes.map_or(true, |c| {
+        matches!(c.get(id), Some(C::Added | C::Modified | C::Implemented))
+    });
+    if !in_scope || !report.not_property.iter().any(|p| p == id) {
+        return Vec::new();
+    }
+    crate::gate::not_property_failures(id, report.tests_for(id))
+}
+
 /// Why `id` is not proven, judged the way the gate classifies it against the merge-base:
 /// `changes` is that classification, `None` without a merge-base. Only added and modified
 /// scenarios need red before green; an unchanged or implemented one needs only a green latest

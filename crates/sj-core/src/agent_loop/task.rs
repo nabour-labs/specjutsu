@@ -5,7 +5,9 @@ use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 
-use super::{classification, default_base, task_number, why_unproven_against_base, Ledger};
+use super::{
+    classification, default_base, not_property, task_number, why_unproven_against_base, Ledger,
+};
 use crate::authoring::{self, blocks};
 use crate::config::Mode;
 use crate::gate;
@@ -26,12 +28,15 @@ pub enum Outcome {
     Done {
         text: String,
         warnings: Vec<Unproven>,
+        /// `not-property` lines for FOR ALL scenarios with only example tests (LOOP-039).
+        not_property: Vec<String>,
         /// Why the merge-base classification couldn't be read, when it couldn't.
         notes: Vec<String>,
     },
     /// Strict mode: nothing was written.
     Refused {
         unproven: Vec<Unproven>,
+        not_property: Vec<String>,
         notes: Vec<String>,
     },
 }
@@ -56,16 +61,23 @@ fn line_starts(raw: &[u8]) -> Vec<usize> {
     out
 }
 
+/// The classification and the gate's trace report, as `classify` returns them.
+type Classified = (
+    Option<BTreeMap<String, gate::Change>>,
+    Option<crate::trace::Report>,
+);
+
 /// Each scenario's change against the merge-base with the default branch (never `--base`), as
-/// the gate sees it; `None` without one or when the merge-base is HEAD (LOOP-036).
-fn classify(root: &Path, spec_root: &Path) -> Result<Option<BTreeMap<String, gate::Change>>> {
+/// the gate sees it, `None` without one or when the merge-base is HEAD (LOOP-036); and the
+/// gate's trace report, `None` without a default branch.
+fn classify(root: &Path, spec_root: &Path) -> Result<Classified> {
     let Some(base) = default_base(root, None) else {
-        return Ok(None);
+        return Ok((None, None));
     };
     let config = crate::config::load(root)?;
     let rel = spec_root.strip_prefix(root).unwrap_or(spec_root);
     let prep = gate::prepare(root, rel, &config, &base)?;
-    Ok(classification(root, &prep).cloned())
+    Ok((classification(root, &prep).cloned(), Some(prep.report)))
 }
 
 pub fn done(
@@ -90,33 +102,65 @@ pub fn done(
     let ledger = Ledger::load(root)?;
     let keep = crate::spec::keep_ids(spec_root)?;
     let ids = blocks::task_ids(&task.text);
-    // The gate's classification, worked out only when the ledger alone leaves an ID unproven.
+    // The gate's classification, worked out only when the ledger alone leaves an ID unproven
+    // or the task names a FOR ALL scenario (LOOP-039), whose tests are then scanned.
     // Unreadable, it falls back to the stricter ledger-only rule.
     let mut notes = Vec::new();
-    let changes = if ids
-        .iter()
-        .any(|id| why_unproven_against_base(&ledger, &keep, None, id).is_some())
+    let scenarios = crate::spec::load_scenarios(spec_root)?;
+    let property = crate::spec::property_ids(&scenarios);
+    let for_all = ids.iter().any(|id| property.contains(id));
+    let (changes, report) = if for_all
+        || ids
+            .iter()
+            .any(|id| why_unproven_against_base(&ledger, &keep, None, id).is_some())
     {
         classify(root, spec_root).unwrap_or_else(|e| {
             notes.push(format!(
-                "cannot classify scenarios against the merge-base, so every one needs a red run: {e:#}"
+                "cannot classify scenarios against the merge-base, so every one needs a red run \
+                 and every FOR ALL one a property test: {e:#}"
             ));
-            None
+            (None, None)
         })
     } else {
-        None
+        (None, None)
     };
     let mut unproven = Vec::new();
-    for id in ids {
-        if unproven.iter().any(|u: &Unproven| u.id == id) {
+    for id in &ids {
+        if unproven.iter().any(|u: &Unproven| &u.id == id) {
             continue;
         }
-        if let Some(why) = why_unproven_against_base(&ledger, &keep, changes.as_ref(), &id) {
-            unproven.push(Unproven { id, why });
+        if let Some(why) = why_unproven_against_base(&ledger, &keep, changes.as_ref(), id) {
+            unproven.push(Unproven {
+                id: id.clone(),
+                why,
+            });
         }
     }
-    if mode == Mode::Strict && !unproven.is_empty() {
-        return Ok(Outcome::Refused { unproven, notes });
+    let mut not_property_lines = Vec::new();
+    if for_all {
+        // The gate's report when classified; otherwise the tests are scanned here.
+        let report = match report {
+            Some(r) => r,
+            None => {
+                let config = crate::config::load(root)?;
+                let scan = crate::testscan::scan_project(root, &config)?;
+                crate::trace::build_report(&scenarios, &scan.tests)
+            }
+        };
+        let mut seen = Vec::new();
+        for id in &ids {
+            if !seen.contains(&id) {
+                seen.push(id);
+                not_property_lines.extend(not_property(&report, changes.as_ref(), id));
+            }
+        }
+    }
+    if mode == Mode::Strict && !(unproven.is_empty() && not_property_lines.is_empty()) {
+        return Ok(Outcome::Refused {
+            unproven,
+            not_property: not_property_lines,
+            notes,
+        });
     }
 
     let mut raw =
@@ -132,6 +176,7 @@ pub fn done(
     Ok(Outcome::Done {
         text: task.text.clone(),
         warnings: unproven,
+        not_property: not_property_lines,
         notes,
     })
 }

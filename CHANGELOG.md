@@ -19,6 +19,26 @@ All notable changes are recorded here. The format follows
   `spec:` comment above each test, changing no other byte. Once the markers are
   replaced, the change passes `sj gate` as `green:keep`. The `sj-propose` skill has a
   "From existing tests" section for it.
+- Property scenarios: a `- **FOR ALL** <inputs>` step, before WHEN, marks a scenario that
+  must hold for every input. `sj spec validate` reports a FOR ALL step after WHEN as
+  `<ID> FOR ALL step must come before WHEN (<file>:<line>)`, and `sj spec show <ID> --json`
+  reports `"property": true` or `false`. The test scanners mark a test `property` by
+  reading its source: Rust `proptest! { ... }` blocks and `#[proptest]`; Python
+  `@given(...)` or `@hypothesis.given(...)` in a file that imports `hypothesis`; TS/JS
+  `<name>.assert(`, `.property(` or `.asyncProperty(` where `<name>` is bound by a
+  default, namespace or `require` import of `fast-check`. Aliases of named imports,
+  re-exports, `@fast-check/vitest` `test.prop`, a callback passed by reference and the
+  closure form `proptest!(|..| ..)` aren't detected. `sj trace --json` reports
+  `"property"` on each test. A FOR ALL scenario whose tests are all example tests is
+  listed by `sj trace` as `not-property <ID> <test>...` and under `not_property` in
+  `--json`; `--strict` exits 1 on it and the baseline never records it. `sj gate` fails
+  it, `[keep]` ones included, with `not-property <ID> <test> (a FOR ALL scenario needs a
+  property test; write one with <library>)`, naming proptest, Hypothesis or fast-check
+  for the suite. In a scenario with both kinds, only the property tests count as
+  evidence on base, and the example tests must still pass at head. The pass line counts
+  proven properties (`gate: pass — 2 scenarios proven (2 red:assert; 1 property)`), and
+  each `proven` entry in `--json` has `"property": true` or `false`. Keeping the shrunk
+  counterexample as evidence is planned as `property-counterexamples`.
 
 ### Changed
 - `sj trace` marks Rust tests with `#[ignore]` or `#[ignore = "..."]` as `skipped`, as it

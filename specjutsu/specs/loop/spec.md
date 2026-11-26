@@ -218,3 +218,36 @@ tell whether the gate will record it `green:linked` (GATE-060).
 #### Scenario: LOOP-037 Verify does not let a never-red implemented scenario cover source
 - **WHEN** the merge-base has scenario STAFF-063 with no test, the change adds its first test, which has only `passed` records in the ledger, edits `src/lib.rs`, and names no other scenario
 - **THEN** `sj verify` reports `unspecified change` listing `src/lib.rs` and exits 1
+
+### Requirement: sj verify reports FOR ALL scenarios without a property test
+`sj verify [<change>]` SHALL report every added, modified or implemented FOR ALL scenario
+whose mapped tests are all non-property tests as `not-property <ID> <test>`, by the same rule
+as the gate, and exit 1. A red-then-green ledger record from an example test SHALL NOT make
+such a scenario pass verify.
+
+#### Scenario: LOOP-038 Verify reports a FOR ALL scenario with only example tests
+- **WHEN** a change adds FOR ALL scenario PAY-020, its only test `pay_020_refund_of_50_on_100` is not a property test, and the ledger shows it failed and then passed
+- **THEN** `sj verify` prints `not-property PAY-020 pay_020_refund_of_50_on_100` and exits 1
+
+#### Scenario: LOOP-040 [keep] Verify leaves an unchanged FOR ALL scenario alone
+- **WHEN** a change's MODIFIED requirement carries FOR ALL scenario PAY-020 unchanged, with only an example test, next to a modified scenario PAY-021
+- **THEN** `sj verify` prints no `not-property` line
+
+### Requirement: sj task done refuses a FOR ALL scenario without a property test
+In `strict` mode, `sj task done <change> <task-number>` SHALL refuse, exiting 1 and leaving
+`tasks.md` unchanged, when the task names an added, modified or implemented FOR ALL scenario
+whose mapped tests are all non-property tests, and print `not-property <ID> <test>` for it as
+`sj verify` does, even when the ledger shows red-before-green. In `guided` and `advisory`
+modes it SHALL check the box and print the same line as a warning.
+
+#### Scenario: LOOP-039 Strict task done refuses a FOR ALL scenario with only example tests
+- **WHEN** mode is `strict`, task 1.1 names FOR ALL scenario PAY-020, its only test `pay_020_refund_of_50_on_100` is not a property test, and the ledger shows it failed and then passed
+- **THEN** `sj task done refunds 1.1` prints `not-property PAY-020 pay_020_refund_of_50_on_100`, exits 1 and leaves `tasks.md` unchanged
+
+#### Scenario: LOOP-041 [keep] Strict task done accepts a FOR ALL scenario with a property test
+- **WHEN** mode is `strict`, task 1.1 names FOR ALL scenario PAY-020, which has a property test and an example test, and the ledger shows red-before-green
+- **THEN** `sj task done refunds 1.1` checks the box, prints no `not-property` line and exits 0
+
+#### Scenario: LOOP-042 [keep] Strict task done accepts an unchanged FOR ALL scenario
+- **WHEN** mode is `strict`, and the task names FOR ALL scenario PAY-020, carried unchanged in a MODIFIED requirement with only an example test
+- **THEN** `sj task done` checks the box, prints no `not-property` line and exits 0

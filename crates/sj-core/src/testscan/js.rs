@@ -58,6 +58,7 @@ pub fn scan_js(file: &Path, content: &str) -> Vec<TestFn> {
     let toks = tokenize(content);
     let close = matching_parens(&toks);
     let lines: Vec<&str> = content.lines().collect();
+    let fc_names = fast_check_names(&toks);
 
     struct Group {
         title: String,
@@ -113,6 +114,7 @@ pub fn scan_js(file: &Path, content: &str) -> Vec<TestFn> {
                 end_line: toks[call.end].line,
                 focused: call.focused || groups.iter().any(|g| g.focused),
                 marker_group,
+                property: calls_fast_check(&toks[call.body_start..call.end], &fc_names),
                 ..TestFn::default()
             });
         }
@@ -196,6 +198,65 @@ fn match_call(toks: &[Token], close: &[Option<usize>], i: usize) -> Option<Call>
         }),
         _ => None,
     }
+}
+
+/// fast-check calls that make a test a property test.
+const FAST_CHECK_CALLS: [&str; 3] = ["assert", "property", "asyncProperty"];
+
+/// Names bound to `fast-check` by `import fc from`, `import fc, {…} from`, `import * as fc from`,
+/// `import fc = require(…)` or `const fc = require(…)`.
+fn fast_check_names(toks: &[Token]) -> Vec<String> {
+    let is_fc = |k: usize| matches!(toks.get(k).map(|t| &t.tok), Some(Tok::Str { text, plain: true }) if text == "fast-check");
+    let ident =
+        |k: usize, w: &str| matches!(toks.get(k).map(|t| &t.tok), Some(Tok::Ident(x)) if x == w);
+    let name = |k: usize| match toks.get(k).map(|t| &t.tok) {
+        Some(Tok::Ident(x)) => Some(x.clone()),
+        _ => None,
+    };
+    let punct = |k: usize, c: char| toks.get(k).map(|t| &t.tok) == Some(&Tok::Punct(c));
+    let requires_fc = |k: usize| ident(k, "require") && punct(k + 1, '(') && is_fc(k + 2);
+    // The import clause from `k` ends in `from 'fast-check'`.
+    let from_fc = |k: usize| {
+        (k..toks.len())
+            .take_while(|&j| !punct(j, ';') && !ident(j, "import"))
+            .find(|&j| ident(j, "from"))
+            .is_some_and(|j| is_fc(j + 1))
+    };
+    let mut out = Vec::new();
+    for i in 0..toks.len() {
+        let bound = if ident(i, "import") {
+            if punct(i + 1, '*') && ident(i + 2, "as") && from_fc(i + 4) {
+                name(i + 3)
+            } else if (punct(i + 2, '=') && requires_fc(i + 3))
+                || ((ident(i + 2, "from") || punct(i + 2, ',')) && from_fc(i + 2))
+            {
+                name(i + 1)
+            } else {
+                None
+            }
+        } else if ["const", "let", "var"].iter().any(|k| ident(i, k))
+            && punct(i + 2, '=')
+            && requires_fc(i + 3)
+        {
+            name(i + 1)
+        } else {
+            None
+        };
+        out.extend(bound);
+    }
+    out
+}
+
+/// Whether `body` calls `<name>.assert(`, `.property(` or `.asyncProperty(` on a fast-check name.
+fn calls_fast_check(body: &[Token], names: &[String]) -> bool {
+    body.windows(4).enumerate().any(|(k, w)| {
+        let after_dot = k > 0 && body[k - 1].tok == Tok::Punct('.');
+        matches!(&w[0].tok, Tok::Ident(n) if names.contains(n))
+            && !after_dot
+            && w[1].tok == Tok::Punct('.')
+            && matches!(&w[2].tok, Tok::Ident(m) if FAST_CHECK_CALLS.contains(&m.as_str()))
+            && w[3].tok == Tok::Punct('(')
+    })
 }
 
 /// For each `(`, the index of its matching `)`.

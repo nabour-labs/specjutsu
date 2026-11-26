@@ -691,7 +691,7 @@ fn gate_059_a_test_linked_to_existing_behaviour_passes_the_gate() {
     );
     assert_eq!(
         report["proven"],
-        serde_json::json!([{ "id": "STAFF-063", "red": "green:linked" }]),
+        serde_json::json!([{ "id": "STAFF-063", "red": "green:linked", "property": false }]),
         "{report:#}"
     );
 }

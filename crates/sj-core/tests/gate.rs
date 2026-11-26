@@ -153,6 +153,7 @@ fn gate_004_unchanged_gap_warns_but_passes() {
         file: PathBuf::from("spec.md"),
         line: 1,
         keep: false,
+        property: false,
     });
     let r = evaluate(&i);
     assert!(r.pass, "{:?}", r.failures);

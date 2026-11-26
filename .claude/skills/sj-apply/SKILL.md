@@ -31,7 +31,9 @@ change folder, earlier tasks' history or your own summary into it.
 Start a new subagent with `implementer-prompt.md`, `writing-good-tests.md`, the `sj next`
 output, and only the interfaces or decisions from earlier tasks it can't see in the code.
 It writes the failing test, records red with `sj test <ID>`, makes it pass, refactors, and
-commits `test(<ID>): red` and `feat(<ID>): green`. It reports one status:
+commits `test(<ID>): red` and `feat(<ID>): green`. A `**FOR ALL**` scenario needs a
+property test: `proptest` (Rust), `Hypothesis` (Python) or `fast-check` (TS/JS); without
+one the gate fails it as `not-property`. It reports one status:
 
 - `DONE`: go to review.
 - `DONE_WITH_CONCERNS`: read the concerns. If one is about correctness or scope, settle it
@@ -128,4 +130,4 @@ Stop and go back to the loop if you notice any of these:
   implement behaviour no scenario describes.
 - Code that needs no scenario (a refactor, a build script) needs an exemption line in the
   proposal. Ask the user before adding one.
-<!-- specjutsu:generated 085dda9c22639e6e -->
+<!-- specjutsu:generated 23280722ee6b3b33 -->

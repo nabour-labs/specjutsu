@@ -117,7 +117,7 @@ fn gate_037_adding_an_id_and_a_test_at_once_is_still_gated() {
     assert_eq!(r.changes.get("AUTH-001"), Some(&Change::Implemented));
     assert_eq!(
         serde_json::to_value(&r.proven).unwrap(),
-        serde_json::json!([{ "id": "AUTH-001", "red": "green:linked" }]),
+        serde_json::json!([{ "id": "AUTH-001", "red": "green:linked", "property": false }]),
         "{:?}",
         r.failures
     );
