@@ -963,3 +963,38 @@ fn skill_021_sj_propose_names_the_infer_workflow() {
         "section does not point at the test: {section}"
     );
 }
+
+// spec: SKILL-022
+#[test]
+fn skill_022_the_skills_name_for_all_and_the_property_libraries() {
+    let skill = |want: &str| {
+        sj_adapters::claude::SKILLS
+            .iter()
+            .find(|(name, _)| *name == want)
+            .unwrap()
+            .1
+    };
+    let propose = skill("sj-propose");
+    assert!(
+        propose.contains("\n- **FOR ALL** "),
+        "sj-propose shows no `- **FOR ALL**` step"
+    );
+    let apply = skill("sj-apply");
+    for want in [
+        "FOR ALL",
+        "proptest",
+        "Hypothesis",
+        "fast-check",
+        "`not-property`",
+    ] {
+        assert!(apply.contains(want), "sj-apply lacks {want}");
+    }
+    assert_eq!(
+        messages(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../skills")
+                .as_path()
+        ),
+        Vec::<String>::new()
+    );
+}

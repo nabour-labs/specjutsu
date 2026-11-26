@@ -22,6 +22,7 @@ fn trace_001_parse_scenario_ids_from_headings() {
             file: PathBuf::from("spec.md"),
             line: 3,
             keep: false,
+            property: false,
         }]
     );
 }
