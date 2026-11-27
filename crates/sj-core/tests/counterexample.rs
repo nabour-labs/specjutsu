@@ -18,6 +18,28 @@ fn gate_069_hypothesis_falsifying_example_over_several_lines_becomes_one_line() 
 }
 
 #[test]
+fn gate_069_hypothesis_brackets_inside_quoted_strings_do_not_end_the_example() {
+    let text = "Falsifying example: test_pay_020_refund_never_exceeds_charge(\n    \
+                note=')',\n    \
+                memo=\"a\\\"(b\",\n\
+                )\n";
+    assert_eq!(
+        counterexample(text).as_deref(),
+        Some("note=')', memo=\"a\\\"(b\"")
+    );
+}
+
+#[test]
+fn gate_069_hypothesis_example_is_found_after_an_empty_proptest_marker() {
+    let text = "minimal failing input:\n\
+                Falsifying example: test_pay_020_refund_never_exceeds_charge(charge=100, refund=101)\n";
+    assert_eq!(
+        counterexample(text).as_deref(),
+        Some("charge=100, refund=101")
+    );
+}
+
+#[test]
 fn gate_070_fast_check_counterexample_is_shown() {
     let text = "FAIL  PAY-020 refund never exceeds charge\n\
                 Error: Property failed after 4 tests\n\
@@ -65,7 +87,10 @@ proptest! {
         text in failure_text()
     ) {
         if let Some(line) = counterexample(&text) {
-            assert!(!line.contains('\n') && !line.contains('\r'), "line break in {line:?}");
+            assert!(
+                !line.contains(['\n', '\r', '\u{2028}', '\u{2029}', '\u{85}']),
+                "line break in {line:?}"
+            );
             let n = line.chars().count();
             assert!(
                 n <= 200 || (n == 201 && line.ends_with('…')),
