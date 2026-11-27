@@ -66,6 +66,15 @@ pub fn parse_libtest(output: &str) -> Vec<TestResult> {
 
 /// Run `cargo test <args>` in `dir`, optionally with a separate target directory.
 pub fn cargo_test(dir: &Path, args: &[&str], target_dir: Option<&Path>) -> Result<Run> {
+    Ok(cargo_test_failures(dir, args, target_dir)?.0)
+}
+
+/// [`cargo_test`], also returning each failing test's captured output ([`parse_failures`]).
+pub fn cargo_test_failures(
+    dir: &Path,
+    args: &[&str],
+    target_dir: Option<&Path>,
+) -> Result<(Run, BTreeMap<String, String>)> {
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
     let mut cmd = Command::new(cargo);
     cmd.arg("test").args(args).current_dir(dir);
@@ -76,10 +85,11 @@ pub fn cargo_test(dir: &Path, args: &[&str], target_dir: Option<&Path>) -> Resul
         .output()
         .with_context(|| format!("running cargo test in {}", dir.display()))?;
     let stdout = String::from_utf8_lossy(&out.stdout);
-    Ok(Run {
+    let run = Run {
         success: out.status.success(),
         results: parse_libtest(&stdout),
-    })
+    };
+    Ok((run, parse_failures(&stdout)))
 }
 
 /// A `cargo test` run with build-failure detection and per-test failure output.
