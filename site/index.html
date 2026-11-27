@@ -354,7 +354,8 @@ curl -fsSL https://nabour-labs.github.io/specjutsu/install.sh | sh
 <span class="c-m"># Windows (PowerShell)</span>
 irm https://nabour-labs.github.io/specjutsu/install.ps1 | iex
 
-<span class="c-m"># or Homebrew, or Cargo</span>
+<span class="c-m"># or Homebrew (7+ asks you to trust the formula first), or Cargo</span>
+brew trust --formula nabour-labs/tap/specjutsu
 brew install nabour-labs/tap/specjutsu
 cargo binstall specjutsu
 

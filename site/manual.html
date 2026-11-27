@@ -177,7 +177,8 @@ curl -fsSL https://nabour-labs.github.io/specjutsu/install.sh | sh
 <span class="c-m"># Windows: installs into %LOCALAPPDATA%\Programs\sj and adds it to your user PATH</span>
 powershell -ExecutionPolicy ByPass -c "irm https://nabour-labs.github.io/specjutsu/install.ps1 | iex"
 
-<span class="c-m"># Homebrew (macOS and Linux)</span>
+<span class="c-m"># Homebrew (macOS and Linux); Homebrew 7+ asks you to trust the formula first</span>
+brew trust --formula nabour-labs/tap/specjutsu
 brew install nabour-labs/tap/specjutsu
 
 <span class="c-m"># Cargo: binstall downloads the release binary, install builds from source</span>
