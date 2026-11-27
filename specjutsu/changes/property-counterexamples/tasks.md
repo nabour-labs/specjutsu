@@ -7,7 +7,7 @@
 ## 2. Gate
 
 - [x] 2.1 Cargo base runs keep failure text; `Proven.counterexample` in `--json` and the `info    counterexample` text line, only for property tests that are `red:assert` (GATE-068, GATE-071, GATE-072)
-- [ ] 2.2 Evidence cell in `--format markdown` (GATE-074)
+- [x] 2.2 Evidence cell in `--format markdown` (GATE-074)
 
 ## 3. Ledger
 
