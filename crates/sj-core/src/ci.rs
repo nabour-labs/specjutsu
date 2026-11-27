@@ -51,10 +51,14 @@ fn table_row(row: &Row) -> String {
             .collect::<Vec<_>>()
             .join(", ")
     };
+    let evidence = match &row.counterexample {
+        Some(input) => format!("{} (counterexample: {})", row.evidence, input),
+        None => row.evidence.clone(),
+    };
     format!(
         "| {} | {} | {} | {} |",
         row.id,
-        cell(&row.evidence),
+        cell(&evidence),
         tests,
         cell(&hint(row))
     )

@@ -357,6 +357,8 @@ pub struct Row {
     pub keep: bool,
     /// An implemented scenario whose tests all pass on base (GATE-059).
     pub linked: bool,
+    /// The input its property test printed on base, shown after the evidence (GATE-074).
+    pub counterexample: Option<String>,
 }
 
 /// Failures of the exemption rules: unknown kinds, missing reasons, and a spike merging to main.
@@ -495,6 +497,7 @@ pub fn evaluate(input: &Input) -> GateReport {
                 failed: true,
                 keep,
                 linked: false,
+                counterexample: None,
             });
             continue;
         };
@@ -508,6 +511,7 @@ pub fn evaluate(input: &Input) -> GateReport {
                 failed: true,
                 keep,
                 linked: false,
+                counterexample: None,
             });
             continue;
         }
@@ -609,9 +613,11 @@ pub fn evaluate(input: &Input) -> GateReport {
         if ok && green_on_base && weakest.is_none() {
             weakest = Some(Red::Linked);
         }
+        let mut row_counterexample = None;
         if ok {
             if let Some(red) = weakest {
                 let counterexample = counterexample_of(input, id, &m.tests);
+                row_counterexample = counterexample.as_ref().map(|c| c.input.clone());
                 if let Some(c) = &counterexample {
                     r.info.push(format!(
                         "counterexample {}: {}",
@@ -647,6 +653,7 @@ pub fn evaluate(input: &Input) -> GateReport {
             failed: !ok,
             keep,
             linked: linked.contains(*id),
+            counterexample: row_counterexample,
         });
     }
 
