@@ -2,7 +2,7 @@
 
 ## 1. Parser
 
-- [ ] 1.1 `counterexample(text)` for proptest, Hypothesis and fast-check; whitespace, cut at 200 characters, never panics (GATE-069, GATE-070, GATE-073, GATE-075)
+- [x] 1.1 `counterexample(text)` for proptest, Hypothesis and fast-check; whitespace, cut at 200 characters, never panics (GATE-069, GATE-070, GATE-073, GATE-075)
 
 ## 2. Gate
 
