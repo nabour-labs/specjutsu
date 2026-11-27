@@ -216,3 +216,27 @@ fn gate_072_only_a_property_test_failing_its_assertion_on_base_has_a_counterexam
         );
     }
 }
+
+#[test]
+fn gate_074_pr_comment_shows_the_counterexample_in_the_evidence_cell() {
+    let repo = pay_020_change(&proptest_failure());
+
+    let out = Command::cargo_bin("sj")
+        .unwrap()
+        .arg("gate")
+        .arg("--root")
+        .arg(repo.path())
+        .args(["--base", "main", "--format", "markdown"])
+        .output()
+        .unwrap();
+    let body = String::from_utf8(out.stdout).unwrap();
+    let row = body
+        .lines()
+        .find(|l| l.starts_with("| PAY-020 |"))
+        .unwrap_or_else(|| panic!("no PAY-020 row: {body}"));
+    let evidence = row.split(" | ").nth(1).unwrap();
+    assert_eq!(
+        evidence, "red:assert (counterexample: charge = 100, refund = 101)",
+        "{body}"
+    );
+}
