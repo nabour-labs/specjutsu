@@ -1,5 +1,6 @@
-//! LEDGER-013, LEDGER-015 from specjutsu/changes/property-counterexamples: the counterexample
-//! a failing property test printed, kept on its `sj test` ledger record.
+//! LEDGER-013, LEDGER-014, LEDGER-015 from specjutsu/changes/property-counterexamples: the
+//! counterexample a failing property test printed, kept on its `sj test` ledger record and
+//! shown by `sj ledger`.
 
 #[path = "../../sj-core/tests/support/mod.rs"]
 mod support;
@@ -131,4 +132,37 @@ fn ledger_015_records_without_a_counterexample_stay_as_they_are() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+#[test]
+fn ledger_014_sj_ledger_shows_the_latest_red_counterexample() {
+    let repo = repo();
+    let red = r#"{"v":1,"run":"1-1","ts":1,"tree":"aaaa","test":"pay_020_refund_never_exceeds_charge","ids":["PAY-020"],"result":"failed","counterexample":"charge = 100, refund = 101"}"#;
+    let green = r#"{"v":1,"run":"2-1","ts":2,"tree":"bbbb","test":"pay_020_refund_never_exceeds_charge","ids":["PAY-020"],"result":"passed"}"#;
+    repo.write(".specjutsu/ledger/runs.jsonl", &format!("{red}\n{green}\n"));
+
+    let out = sj(repo.path(), &["ledger", "PAY-020"]);
+    assert!(out.status.success(), "{out:?}");
+    let text = String::from_utf8_lossy(&out.stdout);
+    let line = text
+        .lines()
+        .find(|l| l.contains("PAY-020"))
+        .unwrap_or_else(|| panic!("no PAY-020 line: {text}"));
+    assert!(line.starts_with("proven"), "{text}");
+    assert!(
+        line.contains("(counterexample: charge = 100, refund = 101)"),
+        "{text}"
+    );
+
+    let out = sj(repo.path(), &["ledger", "--json"]);
+    assert!(out.status.success(), "{out:?}");
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let s = v["scenarios"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == "PAY-020")
+        .unwrap_or_else(|| panic!("PAY-020 missing: {v:#}"));
+    assert_eq!(s["proven"], true, "{v:#}");
+    assert_eq!(s["counterexample"], "charge = 100, refund = 101", "{v:#}");
 }
