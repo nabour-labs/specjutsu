@@ -42,7 +42,7 @@ None.
 - `crates/sj-core/src/gate.rs`: keep Cargo base failure text, add a counterexample to
   `Proven` and `Row`, and add the info line.
 - `crates/sj-core/src/ci.rs`: the evidence cell in markdown.
-- A new counterexample parser module in `sj-core`. It has no new dependencies.
+- A new counterexample parser module in `sj-core`. It has no new runtime dependencies. `proptest` is added as a dev-dependency for the GATE-075 property test.
 - `crates/sj-core/src/ledger.rs` and `run/`: an optional `counterexample` on `Record`
   (`#[serde(default)]`) and `ScenarioStatus`. The ledger format version stays the same.
 - README (gate output, property scenarios, ledger) and CHANGELOG.
