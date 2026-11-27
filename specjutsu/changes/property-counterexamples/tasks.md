@@ -16,4 +16,4 @@
 
 ## 4. Docs
 
-- [ ] 4.1 README (gate output, property scenarios, ledger, roadmap), site manual (`sj gate` output and `sj ledger [ID]` text and `--json`), CHANGELOG, competitive analysis marks `property-counterexamples` shipped (no-scenario: docs)
+- [x] 4.1 README (gate output, property scenarios, ledger, roadmap), site manual (`sj gate` output and `sj ledger [ID]` text and `--json`), CHANGELOG, competitive analysis marks `property-counterexamples` shipped (no-scenario: docs)
