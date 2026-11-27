@@ -30,6 +30,30 @@ fn gate_069_hypothesis_brackets_inside_quoted_strings_do_not_end_the_example() {
 }
 
 #[test]
+fn gate_069_hypothesis_explain_comments_are_left_out() {
+    let text = "Falsifying example: test_pay_020_refund_never_exceeds_charge(\n    \
+                charge=0,  # or any other generated value (see below)\n    \
+                note='#1',  # a ')' here doesn't close it\n    \
+                refund=1,\n\
+                )\n";
+    assert_eq!(
+        counterexample(text).as_deref(),
+        Some("charge=0, note='#1', refund=1")
+    );
+}
+
+#[test]
+fn gate_073_a_cut_that_lands_on_a_space_leaves_no_space_before_the_ellipsis() {
+    let text = format!(
+        "minimal failing input: {} {}\n",
+        "x".repeat(199),
+        "y".repeat(50)
+    );
+    let expected = format!("{}…", "x".repeat(199));
+    assert_eq!(counterexample(&text), Some(expected));
+}
+
+#[test]
 fn gate_069_hypothesis_example_is_found_after_an_empty_proptest_marker() {
     let text = "minimal failing input:\n\
                 Falsifying example: test_pay_020_refund_never_exceeds_charge(charge=100, refund=101)\n";

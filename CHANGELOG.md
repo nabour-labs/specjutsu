@@ -41,7 +41,7 @@ All notable changes are recorded here. The format follows
 - Property counterexamples: when a property test fails its assertion on base, `sj gate`
   reads the shrunk input it printed: proptest `minimal failing input: …`, Hypothesis
   `Falsifying example: <test>(…)` (on one line or several; brackets inside quotes are
-  skipped) and fast-check `Counterexample: …`. Whitespace is collapsed to one line and
+  skipped and `# …` comments explaining an argument are left out) and fast-check `Counterexample: …`. Whitespace is collapsed to one line and
   cut to 200 characters plus `…`. The text report prints `info    counterexample
   PAY-020 pay_020_refund_never_exceeds_charge: charge = 100, refund = 101`, `--json`
   adds `"counterexample": {"test": …, "input": …}` to the `proven` entry, and
