@@ -200,6 +200,7 @@ pub struct ScenarioStatus {
     /// A red record came before a passed record on a different tree.
     pub proven: bool,
     /// The counterexample of the scenario's latest red record, if it has one.
+    /// It is always the latest red record's value, so a later red record without one clears it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub counterexample: Option<String>,
 }

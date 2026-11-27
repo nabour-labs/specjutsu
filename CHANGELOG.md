@@ -37,8 +37,22 @@ All notable changes are recorded here. The format follows
   for the suite. In a scenario with both kinds, only the property tests count as
   evidence on base, and the example tests must still pass at head. The pass line counts
   proven properties (`gate: pass — 2 scenarios proven (2 red:assert; 1 property)`), and
-  each `proven` entry in `--json` has `"property": true` or `false`. Keeping the shrunk
-  counterexample as evidence is planned as `property-counterexamples`.
+  each `proven` entry in `--json` has `"property": true` or `false`.
+- Property counterexamples: when a property test fails its assertion on base, `sj gate`
+  reads the shrunk input it printed: proptest `minimal failing input: …`, Hypothesis
+  `Falsifying example: <test>(…)` (on one line or several; brackets inside quotes are
+  skipped) and fast-check `Counterexample: …`. Whitespace is collapsed to one line and
+  cut to 200 characters plus `…`. The text report prints `info    counterexample
+  PAY-020 pay_020_refund_never_exceeds_charge: charge = 100, refund = 101`, `--json`
+  adds `"counterexample": {"test": …, "input": …}` to the `proven` entry, and
+  `--format markdown` shows `red:assert (counterexample: charge = 100, refund = 101)`
+  in the evidence cell. When a scenario has several, the first of its tests in trace
+  order is shown. A missing or unreadable counterexample never changes the gate's
+  result. The gate's Cargo base run now keeps each failing test's failure text. `sj
+  test` stores `counterexample` on the `failed` ledger record of a property test, `sj
+  ledger` shows the latest red record's as `(counterexample: …)` after the status, and
+  `sj ledger --json` gives it as the entry's `counterexample`. Older ledger lines still
+  load, and the ledger format version is unchanged.
 
 ### Changed
 - `sj trace` marks Rust tests with `#[ignore]` or `#[ignore = "..."]` as `skipped`, as it

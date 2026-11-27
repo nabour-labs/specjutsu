@@ -64,13 +64,12 @@ completions, onboarding). Custom workflow schemas and multi-repo spec stores are
 for v0.7. Beyond parity, these changes take ideas that other tools check with a model and
 check them deterministically instead. Specs from existing tests ships as `sj spec infer`,
 and property scenarios ship as `FOR ALL` scenarios that the gate refuses without a property
-test. Keeping the shrunk counterexample as evidence is the planned follow-up,
-`property-counterexamples`.
+test. The gate also shows the shrunk counterexample the property test found on base.
 
 | Gap | Who has it today | How they check it | specjutsu change |
 | --- | --- | --- | --- |
 | Specs for code that already exists (OpenSpec's most-requested open issue) | cc-sdd, GSD, BMAD | A model reads the code | Ships as `sj spec infer`: it drafts a `[keep]` scenario for every untraced test, and the filled-in change passes the gate as `green:keep` |
-| Requirements that hold for all inputs | Kiro | Property tests, IDE-only, optional | Ships: a `FOR ALL` scenario needs a proptest, Hypothesis or fast-check test, and `sj gate` fails it as `not-property` without one. Keeping the shrunk counterexample as evidence is planned as `property-counterexamples` |
+| Requirements that hold for all inputs | Kiro | Property tests, IDE-only, optional | Ships: a `FOR ALL` scenario needs a proptest, Hypothesis or fast-check test, and `sj gate` fails it as `not-property` without one. The gate and `sj ledger` show the shrunk counterexample the property test printed as evidence |
 | A public, reproducible token benchmark | No one | — | Shipped in v0.6: [the benchmark](https://nabour-labs.github.io/specjutsu-bench/) |
 
 ## Not planned
