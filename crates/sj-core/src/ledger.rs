@@ -61,6 +61,9 @@ pub struct Record {
     pub test: String,
     pub ids: Vec<String>,
     pub result: LedgerResult,
+    /// The input a failing property test printed; absent on older and example-test records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub counterexample: Option<String>,
 }
 
 /// `<root>/.specjutsu/ledger/runs.jsonl`.
@@ -72,7 +75,7 @@ pub fn path(root: &Path) -> PathBuf {
 /// scope selected; a package or workspace build failure is not evidence for any one scenario.
 /// When only some suites failed to build, their selected tests are recorded alongside the rest.
 pub fn records_for(run: &TestRun, run_id: &str, ts: u64, tree: &str) -> Vec<Record> {
-    let make = |test: &str, ids: &[String], result| Record {
+    let make = |test: &str, ids: &[String], result, counterexample: Option<&String>| Record {
         v: FORMAT,
         run: run_id.to_string(),
         ts,
@@ -80,20 +83,21 @@ pub fn records_for(run: &TestRun, run_id: &str, ts: u64, tree: &str) -> Vec<Reco
         test: test.to_string(),
         ids: ids.to_vec(),
         result,
+        counterexample: counterexample.cloned(),
     };
     if run.build_failed {
         run.selected
             .iter()
-            .map(|(name, ids)| make(name, ids, LedgerResult::BuildFailed))
+            .map(|(name, ids)| make(name, ids, LedgerResult::BuildFailed, None))
             .collect()
     } else {
         run.tests
             .iter()
-            .map(|t| make(&t.path, &t.ids, t.result.into()))
+            .map(|t| make(&t.path, &t.ids, t.result.into(), t.counterexample.as_ref()))
             .chain(
                 run.partial_build_failed
                     .iter()
-                    .map(|(name, ids)| make(name, ids, LedgerResult::BuildFailed)),
+                    .map(|(name, ids)| make(name, ids, LedgerResult::BuildFailed, None)),
             )
             .collect()
     }

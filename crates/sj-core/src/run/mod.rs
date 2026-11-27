@@ -63,6 +63,8 @@ pub struct Selection {
     pub only: Option<BTreeMap<String, Vec<String>>>,
     /// Test function name → mapped scenario IDs, for every test in source.
     pub ids: BTreeMap<String, Vec<String>>,
+    /// Names of the mapped tests that are property tests.
+    pub property: BTreeSet<String>,
 }
 
 /// The first lines of a failure's output.
@@ -90,6 +92,9 @@ pub struct TestCase {
     pub ids: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub excerpt: Option<Excerpt>,
+    /// The input a failing property test printed (LEDGER-013).
+    #[serde(skip)]
+    pub counterexample: Option<String>,
 }
 
 /// The outcome of `sj test`, independent of the runner.
@@ -133,8 +138,12 @@ pub fn resolve(root: &Path, spec_root: &Path, scope: &Scope) -> Result<Selection
     let tests = testscan::scan_tree(root)?;
     let report = trace::build_report(&scenarios, &tests);
     let mut ids: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut property = BTreeSet::new();
     for m in &report.mapped {
         for t in &m.tests {
+            if t.property {
+                property.insert(t.name.clone());
+            }
             let v = ids.entry(t.name.clone()).or_default();
             if !v.contains(&m.id) {
                 v.push(m.id.clone());
@@ -143,6 +152,7 @@ pub fn resolve(root: &Path, spec_root: &Path, scope: &Scope) -> Result<Selection
     }
     let mut sel = Selection {
         ids,
+        property,
         ..Selection::default()
     };
     match scope {
@@ -397,6 +407,14 @@ pub fn run_tests(root: &Path, spec_root: &Path, scope: &Scope) -> Result<TestRun
                 excerpt: (result == Outcome::Failed)
                     .then(|| j.message.as_deref().map(|m| excerpt(m, EXCERPT_LINES)))
                     .flatten(),
+                counterexample: (result == Outcome::Failed
+                    && j.test.is_some_and(|i| traced[i].property))
+                .then(|| {
+                    j.message
+                        .as_deref()
+                        .and_then(crate::counterexample::counterexample)
+                })
+                .flatten(),
             });
         }
         sr.pass = failed == 0 && sr.build_errors.is_empty() && (scenario_scope || res.exit_ok);
@@ -466,14 +484,17 @@ fn run_cargo(root: &Path, spec_root: &Path, scope: &Scope) -> Result<TestRun> {
             Outcome::Failed => run.failed += 1,
             Outcome::Ignored => run.ignored += 1,
         }
+        let failure = (r.outcome == Outcome::Failed)
+            .then(|| d.failures.get(&r.path))
+            .flatten();
         run.tests.push(TestCase {
             path: r.path.clone(),
             result: r.outcome,
             ids: sel.ids.get(name).cloned().unwrap_or_default(),
-            excerpt: (r.outcome == Outcome::Failed)
-                .then(|| d.failures.get(&r.path))
-                .flatten()
-                .map(|t| excerpt(t, EXCERPT_LINES)),
+            excerpt: failure.map(|t| excerpt(t, EXCERPT_LINES)),
+            counterexample: failure
+                .filter(|_| sel.property.contains(name))
+                .and_then(|t| crate::counterexample::counterexample(t)),
         });
     }
     // With a post-filter, a dropped unrelated failure must not fail the run.
