@@ -42,8 +42,9 @@ a release. If `install.sh` says to add the folder to your `PATH`, do that for th
 (`export PATH="$HOME/.local/bin:$PATH"`) and tell the user to add it to their shell
 profile; it never edits profiles itself.
 
-If the user prefers a package manager: `brew install nabour-labs/tap/specjutsu`, or
-`cargo binstall specjutsu`. On a platform with no release, build from source with
+If the user prefers a package manager: `brew trust --formula nabour-labs/tap/specjutsu`
+then `brew install nabour-labs/tap/specjutsu` (Homebrew 7+ refuses untrusted tap formulae),
+or `cargo binstall specjutsu`. On a platform with no release, build from source with
 `cargo install specjutsu`. Run `sj --version` again before going on.
 
 ## 3. Set up the project
