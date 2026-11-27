@@ -11,7 +11,7 @@
 
 ## 3. Ledger
 
-- [ ] 3.1 `counterexample` on red records of property tests; old records load (LEDGER-013, LEDGER-015)
+- [x] 3.1 `counterexample` on red records of property tests; old records load (LEDGER-013, LEDGER-015)
 - [ ] 3.2 `sj ledger` and `--json` show the latest red counterexample (LEDGER-014)
 
 ## 4. Docs
