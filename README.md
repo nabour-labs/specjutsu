@@ -1096,7 +1096,10 @@ Each run appends one line per test to `.specjutsu/ledger/runs.jsonl`
 (gitignored, local only). Each line holds the run ID, the time, the git tree hash
 of the working tree, the test, its scenario IDs and the result. `sj ledger`
 reads it back. A scenario is **proven** when a failing run was recorded before
-a passing one, on different code. Pass `--no-ledger` to skip recording.
+a passing one, on different code. When a scenario's latest failing record holds
+the counterexample its property test printed, `sj ledger` shows it after the
+status, as `(counterexample: charge = 100, refund = 101)`, and `sj ledger --json`
+gives it as the entry's `counterexample`. Pass `--no-ledger` to skip recording.
 
 ## The agent loop
 

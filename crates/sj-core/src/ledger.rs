@@ -199,6 +199,9 @@ pub struct ScenarioStatus {
     pub latest: LedgerResult,
     /// A red record came before a passed record on a different tree.
     pub proven: bool,
+    /// The counterexample of the scenario's latest red record, if it has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub counterexample: Option<String>,
 }
 
 /// Per-scenario status, sorted by ID. History order is file order.
@@ -207,6 +210,7 @@ pub fn report(records: &[Record]) -> Vec<ScenarioStatus> {
         latest: LedgerResult,
         red_trees: BTreeSet<&'a str>,
         proven: bool,
+        counterexample: Option<&'a str>,
     }
     let mut by_id: BTreeMap<&str, Acc> = BTreeMap::new();
     for r in records {
@@ -215,10 +219,12 @@ pub fn report(records: &[Record]) -> Vec<ScenarioStatus> {
                 latest: r.result,
                 red_trees: BTreeSet::new(),
                 proven: false,
+                counterexample: None,
             });
             a.latest = r.result;
             if r.result.is_red() {
                 a.red_trees.insert(r.tree.as_str());
+                a.counterexample = r.counterexample.as_deref();
             } else if r.result == LedgerResult::Passed && a.red_trees.iter().any(|t| *t != r.tree) {
                 a.proven = true;
             }
@@ -230,6 +236,7 @@ pub fn report(records: &[Record]) -> Vec<ScenarioStatus> {
             id: id.to_string(),
             latest: a.latest,
             proven: a.proven,
+            counterexample: a.counterexample.map(str::to_string),
         })
         .collect()
 }
