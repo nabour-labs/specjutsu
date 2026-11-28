@@ -121,9 +121,10 @@ added to your user `PATH`). Set `SJ_VERSION=0.6.0` to pin a release or `SJ_INSTA
 to choose the folder. Or use a package manager:
 
 ```bash
-brew install nabour-labs/tap/specjutsu   # macOS and Linux
-cargo binstall specjutsu                 # downloads the release binary
-cargo install specjutsu                  # builds from source; needs Rust
+brew trust --formula nabour-labs/tap/specjutsu   # Homebrew 7+ asks you to trust it first
+brew install nabour-labs/tap/specjutsu           # macOS and Linux
+cargo binstall specjutsu                         # downloads the release binary
+cargo install specjutsu                          # builds from source; needs Rust
 ```
 
 The archives themselves (macOS arm64 and x64, Linux x64 and arm64, Windows x64 and

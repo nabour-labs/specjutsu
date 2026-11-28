@@ -56,6 +56,9 @@ All notable changes are recorded here. The format follows
   load, and the ledger format version is unchanged.
 
 ### Changed
+- The Homebrew install steps (README, manual, site, setup skill) run
+  `brew trust --formula nabour-labs/tap/specjutsu` first: Homebrew 7+ refuses to load
+  formulae from an untrusted tap.
 - `sj trace` marks Rust tests with `#[ignore]` or `#[ignore = "..."]` as `skipped`, as it
   already did for JS and Python skip markers; it shows in `sj trace --json` and the badge.
 
