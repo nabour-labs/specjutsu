@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use anyhow::{Context, Result};
 use regex::Regex;
 use serde::Serialize;
-use sj_runners::cargo::{cargo_test, Outcome, Run};
+use sj_runners::cargo::{cargo_test, cargo_test_failures, Outcome, Run};
 
 use crate::config::{Config, RedOnBase, Runner};
 use crate::git::Git;
@@ -289,6 +289,22 @@ pub(crate) fn not_property_failures(id: &str, tests: &[trace::TestRef]) -> Vec<S
         .collect()
 }
 
+/// The first counterexample, in trace order, printed by one of `tests` that is a property
+/// test failing its assertion on base (GATE-068/071/072).
+fn counterexample_of(input: &Input, id: &str, tests: &[trace::TestRef]) -> Option<Counterexample> {
+    tests.iter().filter(|t| t.property).find_map(|t| {
+        let key = (id.to_string(), t.name.clone());
+        if input.base.get(&key) != Some(&Red::Assert) {
+            return None;
+        }
+        let found = crate::counterexample::counterexample(input.base_messages.get(&key)?)?;
+        Some(Counterexample {
+            test: t.name.clone(),
+            input: found,
+        })
+    })
+}
+
 fn is_cargo(t: &trace::TestRef) -> bool {
     matches!(t.suite, None | Some(Runner::Cargo))
 }
@@ -299,6 +315,16 @@ pub struct Proven {
     pub red: Red,
     /// A FOR ALL scenario, proven by a property test (GATE-064).
     pub property: bool,
+    /// The input a property test printed when it failed its assertion on base (GATE-068).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub counterexample: Option<Counterexample>,
+}
+
+/// A property test's shrunk failing input, and the test that printed it (GATE-068).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Counterexample {
+    pub test: String,
+    pub input: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
@@ -331,6 +357,8 @@ pub struct Row {
     pub keep: bool,
     /// An implemented scenario whose tests all pass on base (GATE-059).
     pub linked: bool,
+    /// The input its property test printed on base, shown after the evidence (GATE-074).
+    pub counterexample: Option<String>,
 }
 
 /// Failures of the exemption rules: unknown kinds, missing reasons, and a spike merging to main.
@@ -469,6 +497,7 @@ pub fn evaluate(input: &Input) -> GateReport {
                 failed: true,
                 keep,
                 linked: false,
+                counterexample: None,
             });
             continue;
         };
@@ -482,6 +511,7 @@ pub fn evaluate(input: &Input) -> GateReport {
                 failed: true,
                 keep,
                 linked: false,
+                counterexample: None,
             });
             continue;
         }
@@ -583,12 +613,23 @@ pub fn evaluate(input: &Input) -> GateReport {
         if ok && green_on_base && weakest.is_none() {
             weakest = Some(Red::Linked);
         }
+        let mut row_counterexample = None;
         if ok {
             if let Some(red) = weakest {
+                let counterexample = counterexample_of(input, id, &m.tests);
+                row_counterexample = counterexample.as_ref().map(|c| c.input.clone());
+                if let Some(c) = &counterexample {
+                    r.info.push(format!(
+                        "counterexample {}: {}",
+                        label(id, &c.test),
+                        c.input
+                    ));
+                }
                 r.proven.push(Proven {
                     id: id.to_string(),
                     red,
                     property: input.property.contains(*id),
+                    counterexample,
                 });
             }
         }
@@ -612,6 +653,7 @@ pub fn evaluate(input: &Input) -> GateReport {
             failed: !ok,
             keep,
             linked: linked.contains(*id),
+            counterexample: row_counterexample,
         });
     }
 
@@ -1500,7 +1542,8 @@ const SETUP_ERROR_LINES: usize = 20;
 
 /// Check out `rev` in a temporary worktree, overlay the change's test files, and run each Cargo
 /// test target and each non-Cargo suite that holds a scenario test. Returns each target test's
-/// result and, for non-Cargo tests that failed, the base run's failure message.
+/// result and, for non-Cargo tests that failed and Cargo tests that failed their assertion, the
+/// base run's failure message.
 fn run_on_base(
     git: &Git,
     root: &Path,
@@ -1524,7 +1567,7 @@ fn run_on_base(
         }
         let target_dir = root.join("target").join("sj-base");
         // One cargo invocation per test target: (crate dir, target name).
-        let mut runs: BTreeMap<(String, String), Run> = BTreeMap::new();
+        let mut runs: BTreeMap<(String, String), (Run, BTreeMap<String, String>)> = BTreeMap::new();
         let mut out = BTreeMap::new();
         let mut messages = BTreeMap::new();
         for (id, name, file) in jobs {
@@ -1533,17 +1576,17 @@ fn run_on_base(
             if !runs.contains_key(&key) {
                 let dir = wt.join(&crate_dir);
                 let run = if dir.join("Cargo.toml").is_file() {
-                    cargo_test(
+                    cargo_test_failures(
                         &dir,
                         &["--no-fail-fast", "--test", &stem],
                         Some(&target_dir),
                     )?
                 } else {
-                    Run::default()
+                    Default::default()
                 };
                 runs.insert(key.clone(), run);
             }
-            let run = &runs[&key];
+            let (run, failures) = &runs[&key];
             let red = match run.outcome(name) {
                 Some(Outcome::Passed) => Red::Green,
                 Some(Outcome::Failed) => Red::Assert,
@@ -1551,6 +1594,16 @@ fn run_on_base(
                 None if !run.success => Red::Compile,
                 None => Red::NotRun,
             };
+            // GATE-068: keep an assertion failure's text, e.g. for its counterexample.
+            if red == Red::Assert {
+                let suffix = format!("::{name}");
+                if let Some((_, text)) = failures
+                    .iter()
+                    .find(|(path, _)| *path == name || path.ends_with(&suffix))
+                {
+                    messages.insert((id.clone(), name.clone()), text.clone());
+                }
+            }
             out.insert((id.clone(), name.clone()), red);
         }
 

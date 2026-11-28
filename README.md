@@ -83,11 +83,11 @@ and it checks it deterministically:
 
 The [public token benchmark](https://nabour-labs.github.io/specjutsu-bench/) is out: see how many context bytes each workflow
 spends on the same feature, bug fix and change. specjutsu is not ahead everywhere yet:
-the rest of OpenSpec parity (custom workflow schemas, multi-repo spec stores) for
-v0.7, and keeping the shrunk counterexample of a property test as evidence
-(`property-counterexamples`) is next. Specs for code that already exists ship as
+the rest of OpenSpec parity (custom workflow schemas, multi-repo spec stores) is planned for
+v0.7. Specs for code that already exists ship as
 `sj spec infer`, which drafts `[keep]` scenarios from untraced tests, and
-[`FOR ALL` scenarios](#property-scenarios) need a property test. See [How specjutsu compares](docs/competitive-analysis.md) for the full
+[`FOR ALL` scenarios](#property-scenarios) need a property test, whose shrunk
+counterexample the gate shows as evidence. See [How specjutsu compares](docs/competitive-analysis.md) for the full
 comparison, its sources, and the change that closes each gap.
 
 ## Status
@@ -980,6 +980,26 @@ still pass at head. The pass line counts proven properties after the evidence ki
 as in `gate: pass — 2 scenarios proven (2 red:assert; 1 property)`, and each `proven`
 entry in `--json` has `"property": true` or `false`.
 
+When a property test fails its assertion on base, the gate shows the shrunk input that
+broke base, so a reviewer can see the property found a real case. It reads proptest's
+`minimal failing input: …`, Hypothesis's `Falsifying example: <test>(…)` (on one line
+or spread over several; brackets inside quotes don't count) and fast-check's
+`Counterexample: …`. Whitespace becomes one space, and an input longer than 200
+characters is cut there and ends with `…`. The text report prints
+
+```
+info    counterexample PAY-020 pay_020_refund_never_exceeds_charge: charge = 100, refund = 101
+```
+
+`--json` adds `"counterexample": {"test": "pay_020_refund_never_exceeds_charge", "input":
+"charge = 100, refund = 101"}` to the scenario's `proven` entry, and the top-level `info`
+list holds the same line. In `--format markdown` the evidence cell reads
+`red:assert (counterexample: charge = 100, refund = 101)`. When a scenario has more than
+one, the first of its tests in trace order is shown. Example tests and tests that fail
+to compile on base have none. A counterexample is evidence only: when the gate can't
+read one, the scenario still passes as `red:assert`, and nothing about it can fail the
+gate.
+
 ### Specs from existing tests
 
 A project that adopts specjutsu late has tests that no scenario describes.
@@ -1097,7 +1117,12 @@ Each run appends one line per test to `.specjutsu/ledger/runs.jsonl`
 (gitignored, local only). Each line holds the run ID, the time, the git tree hash
 of the working tree, the test, its scenario IDs and the result. `sj ledger`
 reads it back. A scenario is **proven** when a failing run was recorded before
-a passing one, on different code. Pass `--no-ledger` to skip recording.
+a passing one, on different code. When a property test fails, `sj test` stores
+the counterexample it printed on the `failed` record. `sj ledger` shows the
+counterexample of a scenario's latest red record after the status, as
+`(counterexample: charge = 100, refund = 101)`, and `sj ledger --json` gives it as
+the entry's `counterexample`. A later red record without one clears it. Ledger
+lines written before counterexamples existed still load. Pass `--no-ledger` to skip recording.
 
 ## The agent loop
 

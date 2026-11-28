@@ -61,6 +61,9 @@ pub struct Record {
     pub test: String,
     pub ids: Vec<String>,
     pub result: LedgerResult,
+    /// The input a failing property test printed; absent on older and example-test records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub counterexample: Option<String>,
 }
 
 /// `<root>/.specjutsu/ledger/runs.jsonl`.
@@ -72,7 +75,7 @@ pub fn path(root: &Path) -> PathBuf {
 /// scope selected; a package or workspace build failure is not evidence for any one scenario.
 /// When only some suites failed to build, their selected tests are recorded alongside the rest.
 pub fn records_for(run: &TestRun, run_id: &str, ts: u64, tree: &str) -> Vec<Record> {
-    let make = |test: &str, ids: &[String], result| Record {
+    let make = |test: &str, ids: &[String], result, counterexample: Option<&String>| Record {
         v: FORMAT,
         run: run_id.to_string(),
         ts,
@@ -80,20 +83,21 @@ pub fn records_for(run: &TestRun, run_id: &str, ts: u64, tree: &str) -> Vec<Reco
         test: test.to_string(),
         ids: ids.to_vec(),
         result,
+        counterexample: counterexample.cloned(),
     };
     if run.build_failed {
         run.selected
             .iter()
-            .map(|(name, ids)| make(name, ids, LedgerResult::BuildFailed))
+            .map(|(name, ids)| make(name, ids, LedgerResult::BuildFailed, None))
             .collect()
     } else {
         run.tests
             .iter()
-            .map(|t| make(&t.path, &t.ids, t.result.into()))
+            .map(|t| make(&t.path, &t.ids, t.result.into(), t.counterexample.as_ref()))
             .chain(
                 run.partial_build_failed
                     .iter()
-                    .map(|(name, ids)| make(name, ids, LedgerResult::BuildFailed)),
+                    .map(|(name, ids)| make(name, ids, LedgerResult::BuildFailed, None)),
             )
             .collect()
     }
@@ -195,6 +199,10 @@ pub struct ScenarioStatus {
     pub latest: LedgerResult,
     /// A red record came before a passed record on a different tree.
     pub proven: bool,
+    /// The counterexample of the scenario's latest red record, if it has one.
+    /// It is always the latest red record's value, so a later red record without one clears it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub counterexample: Option<String>,
 }
 
 /// Per-scenario status, sorted by ID. History order is file order.
@@ -203,6 +211,7 @@ pub fn report(records: &[Record]) -> Vec<ScenarioStatus> {
         latest: LedgerResult,
         red_trees: BTreeSet<&'a str>,
         proven: bool,
+        counterexample: Option<&'a str>,
     }
     let mut by_id: BTreeMap<&str, Acc> = BTreeMap::new();
     for r in records {
@@ -211,10 +220,12 @@ pub fn report(records: &[Record]) -> Vec<ScenarioStatus> {
                 latest: r.result,
                 red_trees: BTreeSet::new(),
                 proven: false,
+                counterexample: None,
             });
             a.latest = r.result;
             if r.result.is_red() {
                 a.red_trees.insert(r.tree.as_str());
+                a.counterexample = r.counterexample.as_deref();
             } else if r.result == LedgerResult::Passed && a.red_trees.iter().any(|t| *t != r.tree) {
                 a.proven = true;
             }
@@ -226,6 +237,7 @@ pub fn report(records: &[Record]) -> Vec<ScenarioStatus> {
             id: id.to_string(),
             latest: a.latest,
             proven: a.proven,
+            counterexample: a.counterexample.map(str::to_string),
         })
         .collect()
 }

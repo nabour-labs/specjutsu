@@ -16,6 +16,7 @@ fn case(path: &str, ids: &[&str], result: Outcome) -> TestCase {
         result,
         ids: ids.iter().map(|s| s.to_string()).collect(),
         excerpt: None,
+        counterexample: None,
     }
 }
 
@@ -39,6 +40,7 @@ fn rec(id: &str, tree: &str, result: LedgerResult) -> Record {
         test: format!("t_{id}"),
         ids: vec![id.into()],
         result,
+        counterexample: None,
     }
 }
 

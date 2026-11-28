@@ -162,7 +162,7 @@
           <tr><td><code>sj ids</code> for selected capabilities, brainstorming in <code>sj-explore</code></td><td><span class="badge live">v0.6.0</span></td><td>Number only the capabilities you name; <code>sj-explore</code> also handles "let's brainstorm".</td></tr>
           <tr><td><a href="https://nabour-labs.github.io/specjutsu-bench/">Token benchmark</a></td><td><span class="badge live">published</span></td><td>Public comparison against the tools specjutsu replaces: <a href="https://nabour-labs.github.io/specjutsu-bench/">see the results</a>. <code>sj gain</code> is its local half: byte counts on your machine.</td></tr>
           <tr><td><code>sj spec infer</code></td><td><span class="badge next">Unreleased</span></td><td>Draft <code>[keep]</code> scenarios from the untraced tests of an existing project.</td></tr>
-          <tr><td><code>FOR ALL</code> property scenarios</td><td><span class="badge next">Unreleased</span></td><td>A scenario that must hold for every input needs a proptest, Hypothesis or fast-check test, checked by <code>sj trace</code> and <code>sj gate</code>.</td></tr>
+          <tr><td><code>FOR ALL</code> property scenarios</td><td><span class="badge next">Unreleased</span></td><td>A scenario that must hold for every input needs a proptest, Hypothesis or fast-check test, checked by <code>sj trace</code> and <code>sj gate</code>; the gate and <code>sj ledger</code> show the shrunk counterexample it found.</td></tr>
         </tbody>
       </table></div>
       <div class="callout"><p><b>In practice today:</b> specjutsu runs the whole loop on its own, from <code>sj spec new</code> to <code>sj spec archive</code>. You don't need OpenSpec, Spec Kit or Superpowers alongside it, and <code>sj migrate</code> removes them for you.</p></div>
@@ -581,7 +581,7 @@ Specjutsu-Exempt: chore — bump dependencies</pre>
       </div>
       <div class="cmd">
         <h3>sj gate</h3>
-        <p>CI check: every changed scenario tested, red on base, green on head. A pass sums the evidence, as in <code>gate: pass — 2 scenarios proven (1 red:assert, 1 green:linked)</code>. <code>--json</code> lists linked scenarios in <code>proven</code> with <code>"red": "green:linked"</code>, and <code>--format markdown</code> under <strong>Linked existing behaviour</strong>. Proven FOR ALL scenarios are counted after the evidence kinds, as in <code>gate: pass — 2 scenarios proven (2 red:assert; 1 property)</code>, and each <code>proven</code> entry in <code>--json</code> carries <code>"property": true</code> or <code>false</code>.</p>
+        <p>CI check: every changed scenario tested, red on base, green on head. A pass sums the evidence, as in <code>gate: pass — 2 scenarios proven (1 red:assert, 1 green:linked)</code>. <code>--json</code> lists linked scenarios in <code>proven</code> with <code>"red": "green:linked"</code>, and <code>--format markdown</code> under <strong>Linked existing behaviour</strong>. Proven FOR ALL scenarios are counted after the evidence kinds, as in <code>gate: pass — 2 scenarios proven (2 red:assert; 1 property)</code>, and each <code>proven</code> entry in <code>--json</code> carries <code>"property": true</code> or <code>false</code>. When a property test fails its assertion on base, the gate shows the shrunk input it printed (proptest <code>minimal failing input:</code>, Hypothesis <code>Falsifying example:</code>, fast-check <code>Counterexample:</code>), on one line of at most 200 characters plus <code>…</code>: the text report prints <code>info    counterexample PAY-020 pay_020_refund_never_exceeds_charge: charge = 100, refund = 101</code>, <code>--json</code> adds <code>"counterexample": {"test": …, "input": …}</code> to the <code>proven</code> entry, and <code>--format markdown</code> shows <code>red:assert (counterexample: charge = 100, refund = 101)</code> as the evidence. A missing or unreadable counterexample never changes the result.</p>
         <dl>
           <dt>--base &lt;ref&gt;</dt><dd>Base to compare against, e.g. <code>origin/main</code>. A ref that doesn't resolve exits 2 with a hint about <code>fetch-depth: 0</code>.</dd>
           <dt>--since &lt;commit&gt;</dt><dd>Check commit history instead: every <code>feat(ID)</code> commit needs an earlier <code>test(ID): red</code>.</dd>
@@ -598,7 +598,10 @@ Specjutsu-Exempt: chore — bump dependencies</pre>
       </div>
       <div class="cmd">
         <h3>sj ledger [ID]</h3>
-        <p>Per scenario: the latest result, and whether red-before-green is proven.</p>
+        <p>Per scenario: the latest result, and whether red-before-green is proven. When the scenario's latest red record holds the counterexample its property test printed, it follows the status, as in <code>proven  PAY-020  latest passed (counterexample: charge = 100, refund = 101)</code>; a later red record without one clears it.</p>
+        <dl>
+          <dt>--json</dt><dd><code>scenarios</code> (<code>id</code>, <code>latest</code>, <code>proven</code>, and <code>counterexample</code> when there is one) and <code>skipped</code>, the number of unreadable lines.</dd>
+        </dl>
       </div>
       <div class="cmd">
         <h3>sj gain</h3>

@@ -1508,7 +1508,12 @@ fn ledger_cmd(id: Option<String>, root: PathBuf, json: bool) -> Result<ExitCode>
         );
         for s in &report {
             let tag = if s.proven { "proven" } else { "open" };
-            println!("{tag:<8}{}  latest {}", s.id, s.latest.as_str());
+            let cx = s
+                .counterexample
+                .as_ref()
+                .map(|c| format!(" (counterexample: {c})"))
+                .unwrap_or_default();
+            println!("{tag:<8}{}  latest {}{cx}", s.id, s.latest.as_str());
         }
     }
     Ok(ExitCode::SUCCESS)

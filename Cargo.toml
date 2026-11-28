@@ -27,5 +27,6 @@ quick-xml = "0.37"
 tempfile = "3"
 assert_cmd = "2"
 predicates = "3"
+proptest = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 ureq = { version = "2.12", default-features = false, features = ["tls", "json"] }
